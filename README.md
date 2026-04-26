@@ -1,12 +1,91 @@
-# hermony-note-v2（§21.2 多端协同）
+# hermony-note-v4（§21.4 测试 + CI）
 
-Hermony NEXT 教程站 §21.2 实战 II 对应代码。本工程是 5 实战累积演进的第二站，
-基于 v1.0.0 fork 加多端协同能力。
+Hermony NEXT 教程站 §21.4 实战 IV 对应代码。本工程是 5 实战累积演进的第四站，
+基于 **v2.0.0 fork**（含 v1 业务 + v2 多端协同），加 Hypium 测试 + UI 自动化 + AGC CI 流水线。
 
-> v1 已 ship 的 7 处 `[feat-N]` 业务和 3 处教学型性能债**完整保留**（教学债是
-> §21.3 演示样本，与 v2 多端能力解耦，不在 v2 修复范围内）。
+> v1 / v2 已 ship 业务 + 3 处教学型性能债**完整保留**（教学债是 §21.3 演示样本，
+> v3-perf-* 分支负责修复，本分支不动业务代码，只加测试 + CI）。
 
-## v2-multidevice (本分支) — 多端协同
+## v4-test-ci (本分支) — 测试 + CI
+
+基于 v2.0.0 fork，加：
+
+- **[v4-1] Hypium 单元测试**（NoteRdb / NoteStore / UserPrefsStore）
+  - 真 RDB 链路：init / insert / query / update / delete / count（NoteRdb）
+  - MockKit ordinary mock：替换 NoteRdb 依赖测 NoteStore（add / update / remove / loadAll）
+  - 真 Preferences 链路：roundtrip / 重启持久化 / 非法值归一 / 损坏 JSON 兜底（UserPrefsStore）
+  - 异步用例统一 `done callback + try/catch + done(error) + timeout 10000`
+    （见 hermony §16.5 反例 1：默认 5s 在 CI 不够 / 异常路径漏 done 撑爆超时）
+  - jacoco 覆盖率门槛：`data/** ≥ 80% line` / `utils/** ≥ 50% line`
+  - `module.json5` 加 testRunner 配置 + `build-profile.json5` 加 testCompileMode = mixed
+- **[v4-2] UI 自动化**（driver.findComponent + click + assertVisible）
+  - 4 个用例：list_page 渲染（LEVEL0 smoke）/ click_fab 跳转详情（LEVEL0）
+    / long_press 触发分享（LEVEL1 regression）/ click_gear 进设置页（LEVEL1）
+  - `retryOnFlaky` helper：仅对 component-not-found / timeout retry 上限 2 次，
+    业务 assertion fail / crash 一律不 retry（见 §16.5b 反模式 A）
+  - `TestType.FUNCTION | Level.LEVEL0/LEVEL1 | Size.SMALLTEST/MEDIUMTEST` 三件套分级
+- **[v4-3] .agc-pipeline.yaml**（6 阶段 CI）
+  - lint → test（jacoco 门禁）→ build（mktemp + chmod 600 + trap rm）
+    → sign（独立阶段便于回查）→ distribute（manual gate）→ ui-test（4 路 sharding 并行）
+  - 失败 dual channel 通知：飞书 webhook + 邮件
+  - 触发规则：`on_push` 跑到 sign / `on_schedule` cron 0 2 * * * 跑 ui-test / `on_tag` 全流水线
+- **[v4-4] 制品 hash + AGC Hosting 链接**（`docs/`，mock 数据）
+  - `docs/artifact-hash.txt`：mock sha256 + 构建 / 签名命令（M8 真机批次替换为真实 hash）
+  - `docs/agc-hosting-link.txt`：mock AGC 链接 + 灰度计划（5% → 5% → 20% → 50% → 100%）
+    + 回滚预案（rollback_target = v3.0.0）
+- **[v4-5] README 更新**（本文件）
+
+## CI 凭证依赖
+
+`.agc-pipeline.yaml` 用 4 个签名相关环境变量 + 2 个发布 / 通知变量：
+
+| 变量名 | 用途 | 来源 |
+|---|---|---|
+| `KEYSTORE_BASE64` | release.p12 base64（`cat release.p12 \| base64`）| AGC pipeline Secret |
+| `KEYSTORE_PWD`    | keystore 主密码 | AGC pipeline Secret |
+| `KEY_ALIAS`       | 签名 key alias | AGC pipeline Secret |
+| `KEY_PWD`         | 签名 key 密码 | AGC pipeline Secret |
+| `AGC_TOKEN`       | AGC Hosting 上传 token | AGC console → API token |
+| `FEISHU_BOT_URL`  | 失败通知飞书机器人 webhook | 飞书机器人配置 |
+
+CI 凭证准备清单详见 hermony 主仓 `docs/superpowers/practice/m7-ci-credentials-checklist.md`
+（含 keystore 生成命令 / AGC API token 申请路径 / 飞书机器人创建路径 / 双 admin
+变更 RELEASE_KEYSTORE_BASE64 的工作流约束）。
+
+> ⚠️ **永远不要把 keystore 文件 commit 进仓库**，即使加了 `.gitignore` 注释——文件已经在
+> git 历史里就永远在历史里，任何拿到仓库 read 权限的人都能翻出来。修复方式见 hermony §16.6
+> "keystore commit 误入" 反例。
+
+## tag 说明
+
+- `v1.0.0`：单端笔记基线（v1-single 分支），含 3 处教学型性能债，对应 §21.1
+- `v2.0.0`：多端协同版（v2-multidevice 分支），加响应式 / 流转 / 分布式同步，对应 §21.2
+- `v3.0.0`：性能优化版（v3-perf-optimized 分支），修教学债 #1/#2/#3，对应 §21.3
+- `v4.0.0`：**测试 + CI 版本**（**本分支**），加 Hypium 测试 + UI 自动化 + .agc-pipeline.yaml，
+  对应 **§21.4 教程章节**。controller 在 5 个 `[v4-X]` commit + push 之后打 tag。
+- `v5.0.0`：跨平台版（v5-arkts-final 分支），对应 §21.5
+
+## 跑通方式（CI 流水线本地预演）
+
+```bash
+git clone git@github.com:HelloiOS2014/hermony_demo.git
+cd hermony_demo
+git checkout v4-test-ci
+
+# 单元测试（debug 包测试制品）
+hvigorw test --coverage --mode debug
+# 覆盖率报告：entry/build/default/outputs/test/jacoco-report.html
+
+# UI 自动化（smoke，单台模拟器或真机）
+hvigorw uitest --filter "TestCaseLevel=LEVEL0"
+
+# 完整流水线（CI 跑，本地需配 KEYSTORE_BASE64 等环境变量）
+# 见 .agc-pipeline.yaml stages 节
+```
+
+---
+
+## v2-multidevice (上游分支) — 多端协同
 
 基于 v1 fork，加：
 
@@ -20,11 +99,23 @@ Hermony NEXT 教程站 §21.2 实战 II 对应代码。本工程是 5 实战累�
   joinSession + 把本地笔记 mirror 给对端；UserPrefs 持久化，重启后自动 rejoin
 - **module.json5 加 distributedDatasync 权限**：软总线通信放行
 
-## fork 关系
+## fork 关系（v2-multidevice）
 
 - 本分支基于 v1.0.0 tag（v1-single 分支）
 - 7 个 `[feat-N]` commit 来自 v1（业务全保留）
 - v2 增量 commit 用 `[v2-X]` 前缀（5 个）
+
+## fork 关系（v4-test-ci）
+
+- v4-test-ci 分支基于 **v2.0.0 tag** fork（v1 + v2 业务全保留）
+- 5 个 `[v4-X]` commit 不动 v1 / v2 业务代码，只加测试 + CI
+- v4 修改清单（仅本分支独有）：
+  - 新增 `entry/src/test/` 目录（5 个 .ets 文件：Note.test / UserPrefs.test / UiTestList.test
+    / UiTestAbility / OhosTestRunner + List.test 入口）
+  - 修 `entry/src/main/module.json5` 加 testRunner 配置
+  - 修 `entry/build-profile.json5` 加 testCompileMode = mixed + jacoco 阈值
+  - 新增 `.agc-pipeline.yaml`（仓库根）
+  - 新增 `docs/artifact-hash.txt` + `docs/agc-hosting-link.txt`
 
 ## 5 个 `[v2-X]` 增量 commit
 
