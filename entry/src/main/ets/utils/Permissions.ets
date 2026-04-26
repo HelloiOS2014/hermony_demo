@@ -1,12 +1,10 @@
-// Permissions — 通讯录 / 相机权限申请封装
+// Permissions — 通讯录 / 相机权限申请封装（v3-perf-optimized §21.3 修复版）
 //
-// ⚠️ 教学型性能债 #2（§21.3 演示修复用）：
-//   下面的 abilityAccessCtrl 监听器在 aboutToAppear 时注册，但页面在 aboutToDisappear
-//   阶段**没有**对称解绑（off）。
-//   单次进出页面看不出问题，但反复进出该页面会累积监听器引用，导致：
-//     - 内存占用持续上涨
-//     - 同一权限变更回调被触发 N 次（N = 进出次数）
-//   v3-perf-optimized 会在调用方页面的 aboutToDisappear 加 unbindAccessListener。
+// §21.3 修复教学债 #2：bindAccessListener 持久化句柄（subscriber id），
+// 新增对称的 unbindAccessListener 在 aboutToDisappear 调用 am.off。
+// 反复进出页面不再累积监听器：
+//   - 内存平稳
+//   - 同一权限变更回调仅触发 1 次
 //
 // 生产代码请按 §17.x 规范对称注册 / 解绑。
 
@@ -19,9 +17,12 @@ const DOMAIN = 0xFF00
 
 export type GrantStatus = 'granted' | 'denied' | 'denied_forbidden'
 
-// 当前已注册的监听器；故意做成模块级单例，便于 demo "反复进出 → 累积"现象
+// 当前已注册的监听器：v3-2 起持久化句柄，便于 unbindAccessListener 对称解绑
 let listenerRegistered = false
 let lastTokenId: number = 0
+// 持久 atManager 引用 + 注册过的权限集合，off 时必须传与 on 完全一致的 permissions 列表
+let registeredAm: abilityAccessCtrl.AtManager | null = null
+let registeredPermissions: AbilityPermissions[] | null = null
 
 /**
  * 同步接口：申请权限并返回结果。被拒绝时返回 denied / denied_forbidden（一次拒永久拒）。
@@ -47,29 +48,59 @@ export async function requestPermission(
 }
 
 /**
- * 教学债 #2：注册监听 — 仅 add，**不**提供对称的 off 调用点。
- * 调用方在 aboutToAppear 调，aboutToDisappear 漏调 off → 监听器堆积。
+ * §21.3 修复教学债 #2：注册监听并持久化 atManager + permissions 句柄，
+ * 配套 unbindAccessListener 在 aboutToDisappear 调用，单次进出不累积监听器。
  */
 export function bindAccessListener(
   permissions: AbilityPermissions[],
   cb: (perm: AbilityPermissions, granted: boolean) => void
 ): void {
+  // 防御：若上一轮 disappear 漏 off，先解绑旧的，确保单次注册
+  if (registeredAm !== null && registeredPermissions !== null) {
+    try {
+      registeredAm.off('permissionStateChange', [], registeredPermissions)
+      hilog.warn(DOMAIN, TAG, 'previous listener auto-unbound before re-bind')
+    } catch (_e) {
+      // 忽略：上一次未注册成功
+    }
+  }
+
   const am = abilityAccessCtrl.createAtManager()
   try {
     am.on('permissionStateChange', [], permissions, (data) => {
       const granted = data.change === abilityAccessCtrl.PermissionStateChangeType.PERMISSION_GRANTED_OPER
       cb(data.permissionName as AbilityPermissions, granted)
     })
+    registeredAm = am
+    registeredPermissions = permissions
     listenerRegistered = true
-    hilog.info(DOMAIN, TAG, 'listener bound (NOT symmetrically unbound — perf debt #2)')
+    hilog.info(DOMAIN, TAG, 'listener bound (will be symmetrically unbound — perf debt #2 fixed)')
   } catch (err) {
     const e = err as BusinessError
     hilog.error(DOMAIN, TAG, 'bind listener failed code=%{public}d msg=%{public}s', e.code, e.message)
   }
 }
 
-// v3-perf-optimized 会启用此函数，在 aboutToDisappear 调用，与 bindAccessListener 对称：
-// export function unbindAccessListener(...) { am.off('permissionStateChange', ...) }
+/**
+ * §21.3 修复教学债 #2：对称解绑 — aboutToDisappear 调用，必须传与 on 一致的 permissions。
+ * 解绑后字段级置空，避免悬挂引用。
+ */
+export function unbindAccessListener(): void {
+  if (registeredAm === null || registeredPermissions === null) {
+    return
+  }
+  try {
+    registeredAm.off('permissionStateChange', [], registeredPermissions)
+    hilog.info(DOMAIN, TAG, 'listener unbound (symmetric off — perf debt #2 fixed)')
+  } catch (err) {
+    const e = err as BusinessError
+    hilog.error(DOMAIN, TAG, 'unbind listener failed code=%{public}d msg=%{public}s', e.code, e.message)
+  } finally {
+    registeredAm = null
+    registeredPermissions = null
+    listenerRegistered = false
+  }
+}
 
 export function isListenerRegistered(): boolean {
   return listenerRegistered

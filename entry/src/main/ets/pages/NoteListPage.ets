@@ -1,7 +1,7 @@
 // NoteListPage — 笔记列表（v3-perf-optimized §21.3 修复中，分多步）
 //
 // 教学型性能债 #1：已修复（keyGenerator 改用 item.id）
-// 教学型性能债 #2：v1 故意**不实现** aboutToDisappear 解绑监听器（v3-2 修复）
+// 教学型性能债 #2：已修复（aboutToDisappear 调 unbindAccessListener 对称解绑）
 // 教学型性能债 #3：在 NoteStore 模块（v3-3 改 V2 @ObservedV2 + @Trace 字段级）
 
 import { Note } from '../data/Note'
@@ -9,7 +9,7 @@ import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
 import { genNoteId } from '../data/Note'
 import { common, Permissions as AbilityPermissions } from '@kit.AbilityKit'
 import { promptAction } from '@kit.ArkUI'
-import { bindAccessListener, requestPermission, GrantStatus } from '../utils/Permissions'
+import { bindAccessListener, unbindAccessListener, requestPermission, GrantStatus } from '../utils/Permissions'
 import { shareNote } from '../utils/ShareNote'
 
 // IDataSource 实现：v1 版做最简实现，每次外部数据改动都整体 reload
@@ -62,9 +62,7 @@ export struct NoteListPage {
     }
     this.loading = false
 
-    // 教学债 #2 触发点：在 aboutToAppear 注册 abilityAccessCtrl 监听器
-    // 但 aboutToDisappear **不**调用对称的 unbind，反复进出列表会累积监听器引用。
-    // §21.3 修复后会在 aboutToDisappear 加 unbindAccessListener。
+    // §21.3 修复教学债 #2：注册监听 + aboutToDisappear 对称 unbindAccessListener。
     bindAccessListener(
       ['ohos.permission.READ_CONTACTS', 'ohos.permission.CAMERA'],
       (perm, granted) => {
@@ -75,8 +73,10 @@ export struct NoteListPage {
     )
   }
 
-  // ⚠️ 教学债 #2：v1 故意**不实现** aboutToDisappear 解绑监听器
-  // aboutToDisappear(): void { unbindAccessListener(...) }   ← v3 修复后启用
+  // §21.3 修复教学债 #2：aboutToDisappear 对称解绑监听器，反复进出不累积
+  aboutToDisappear(): void {
+    unbindAccessListener()
+  }
 
   private formatTime(ts: number): string {
     const d = new Date(ts)
