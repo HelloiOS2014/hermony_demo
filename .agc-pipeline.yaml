@@ -1,0 +1,195 @@
+# .agc-pipeline.yaml — Hermony Note v4 完整 CI 流水线（lint → test → build → sign → distribute → ui-test）
+#
+# 设计依据（hermony §16.6 / §16.5b）：
+#   - 5 阶段化（lint / test / build / sign / distribute）+ ui-test 分阶段
+#   - keystore base64 走 CI Secret，sign 阶段 echo "$KEYSTORE_BASE64" | base64 -d 还原临时文件
+#     流水线结束 runner 销毁；keystore 永远不入仓
+#   - signingConfigs 字段全部走环境变量（KEYSTORE_PWD / KEY_ALIAS / KEY_PWD）
+#   - ui-test 分 sharding：hvigorw uitest --shard $SHARD_INDEX --shards $SHARD_TOTAL
+#     PR 检入只跑 LEVEL0（smoke），定时跑 LEVEL1（regression）
+#   - 失败通知走飞书 webhook + 邮件 dual channel（防单 channel 失效漏报）
+#
+# CI 凭证清单见 hermony 主仓 docs/superpowers/practice/m7-ci-credentials-checklist.md
+
+version: '1.0'
+
+# ── 全局环境变量声明（流水线运行时需 CI Secret 注入）──
+env:
+  global:
+    - DEPLOY_ENV: ci
+    - HVIGOR_VERSION: 5.0.5
+  secrets:
+    - KEYSTORE_BASE64    # release.p12 base64 → cat release.p12 | base64
+    - KEYSTORE_PWD       # keystore 主密码
+    - KEY_ALIAS          # 签名 key alias
+    - KEY_PWD            # 签名 key 密码
+    - AGC_TOKEN          # AGC Hosting 上传 token
+    - FEISHU_BOT_URL     # 飞书机器人 webhook（失败告警）
+
+stages:
+  # ─────────────────────────────────────────────
+  # 1. lint（< 1min）—— PR 检入第一道闸
+  # ─────────────────────────────────────────────
+  - name: lint
+    image: harmony-ci:5.0.5
+    script:
+      - hvigorw clean
+      - hvigorw lint
+    cache:
+      paths:
+        - oh_modules/
+        - .hvigor/
+
+  # ─────────────────────────────────────────────
+  # 2. test（5–8min）—— Hypium 单元测试 + jacoco 覆盖率门禁
+  # ─────────────────────────────────────────────
+  - name: test
+    image: harmony-ci:5.0.5
+    needs: [lint]
+    script:
+      - hvigorw test --coverage --mode debug
+      - cat entry/build/default/outputs/test/coverage-summary.txt || true
+    artifacts:
+      when: always
+      paths:
+        - entry/build/default/outputs/test/jacoco-report.html
+        - entry/build/default/outputs/test/jacoco-report.xml
+        - entry/build/default/outputs/test/test-results.xml
+      expire_in: 30 days
+    coverage:
+      enforce: true
+      thresholds:
+        line: 80      # 业务核心 ≥ 80%
+        branch: 70
+
+  # ─────────────────────────────────────────────
+  # 3. build（3–5min）—— assembleHap release 产物
+  # ─────────────────────────────────────────────
+  - name: build
+    image: harmony-ci:5.0.5
+    needs: [test]
+    env:
+      - KEYSTORE_BASE64
+      - KEYSTORE_PWD
+      - KEY_ALIAS
+      - KEY_PWD
+    script:
+      # keystore 还原到 runner 临时目录（chmod 600 防 K8s 邻居容器读）
+      - KEYSTORE_TMP=$(mktemp /tmp/release.XXXXXX.p12)
+      - echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_TMP"
+      - chmod 600 "$KEYSTORE_TMP"
+      - export KEYSTORE_PATH="$KEYSTORE_TMP"
+      - trap 'rm -f "$KEYSTORE_TMP"' EXIT
+      - hvigorw assembleHap --mode release --no-daemon
+    artifacts:
+      paths:
+        - entry/build/default/outputs/default/entry-default-signed.hap
+        - entry/build/default/outputs/default/entry-default-unsigned.hap
+      expire_in: 7 days
+
+  # ─────────────────────────────────────────────
+  # 4. sign（1–2min）—— hvigor signHap 单独显式阶段（便于回查签名失败）
+  # ─────────────────────────────────────────────
+  - name: sign
+    image: harmony-ci:5.0.5
+    needs: [build]
+    env:
+      - KEYSTORE_BASE64
+      - KEYSTORE_PWD
+      - KEY_ALIAS
+      - KEY_PWD
+    script:
+      - KEYSTORE_TMP=$(mktemp /tmp/release.XXXXXX.p12)
+      - echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_TMP"
+      - chmod 600 "$KEYSTORE_TMP"
+      - trap 'rm -f "$KEYSTORE_TMP"' EXIT
+      - |
+        hvigorw signHap \
+          --keystore-path "$KEYSTORE_TMP" \
+          --keystore-pwd  "$KEYSTORE_PWD" \
+          --key-alias     "$KEY_ALIAS" \
+          --key-pwd       "$KEY_PWD"
+      # 签名后产物校验（防 keystore 还原不全 / 签名 chain 不完整）
+      - test -f entry/build/default/outputs/default/entry-release-signed.hap
+    artifacts:
+      paths:
+        - entry/build/default/outputs/default/entry-release-signed.hap
+
+  # ─────────────────────────────────────────────
+  # 5. distribute（2–3min）—— AGC Hosting 上传
+  # ─────────────────────────────────────────────
+  - name: distribute
+    image: harmony-ci:5.0.5
+    needs: [sign]
+    env:
+      - AGC_TOKEN
+    script:
+      - |
+        agc-cli upload \
+          --hap entry/build/default/outputs/default/entry-release-signed.hap \
+          --product release \
+          --version-name v4.0.0 \
+          --token "$AGC_TOKEN"
+    when: manual    # 发版前人工确认（避免 PR 自动推到 AGC）
+
+  # ─────────────────────────────────────────────
+  # 6. ui-test（10–25min）—— 真机池 sharding 4 路并行
+  # ─────────────────────────────────────────────
+  # PR 检入只跑 smoke（LEVEL0 ≈ 5min）；定时夜跑 regression（LEVEL0|1 ≈ 12min sharded）
+  - name: ui-test
+    image: harmony-ci:5.0.5
+    needs: [sign]
+    parallel:
+      matrix:
+        - SHARD_INDEX: 0
+          SHARD_TOTAL: 4
+        - SHARD_INDEX: 1
+          SHARD_TOTAL: 4
+        - SHARD_INDEX: 2
+          SHARD_TOTAL: 4
+        - SHARD_INDEX: 3
+          SHARD_TOTAL: 4
+    script:
+      - |
+        hvigorw uitest \
+          --filter "TestCaseLevel<=LEVEL1" \
+          --shard $SHARD_INDEX \
+          --shards $SHARD_TOTAL \
+          --device-pool harmony-realdevice-pool
+    artifacts:
+      when: always
+      paths:
+        - entry/build/default/outputs/uitest/shard-${SHARD_INDEX}/report.html
+        - entry/build/default/outputs/uitest/shard-${SHARD_INDEX}/screenshots/
+      expire_in: 14 days
+
+# ── 失败通知（dual channel：飞书 + 邮件）──
+notifications:
+  on_failure:
+    - feishu_webhook: ${FEISHU_BOT_URL}
+      template: |
+        🚨 Hermony Note v4 CI 失败
+        阶段：${STAGE_NAME}
+        分支：${CI_BRANCH}
+        commit：${CI_COMMIT_SHORT_SHA}
+        日志：${CI_JOB_URL}
+    - email: dev-alerts@your-company.com
+      subject: '[CI Failure] Hermony Note v4 ${STAGE_NAME}'
+  on_success:
+    - feishu_webhook: ${FEISHU_BOT_URL}
+      when: stage_name == 'distribute'
+      template: |
+        ✅ Hermony Note v4.0.0 已上传 AGC Hosting
+        commit：${CI_COMMIT_SHORT_SHA}
+
+# ── 触发规则 ──
+trigger:
+  on_push:
+    branches: [main, v4-test-ci]
+    stages: [lint, test, build, sign]   # PR 检入跑到 sign，distribute 走 manual
+  on_schedule:
+    cron: '0 2 * * *'    # 每日凌晨 2 点跑全量 ui-test（regression）
+    stages: [lint, test, build, sign, ui-test]
+  on_tag:
+    pattern: 'v[0-9]+\.[0-9]+\.[0-9]+'
+    stages: [lint, test, build, sign, distribute, ui-test]   # tag 触发完整流水线
