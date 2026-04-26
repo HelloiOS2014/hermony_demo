@@ -1,8 +1,11 @@
-// NoteListPage — 笔记列表（v3-perf-optimized §21.3 修复中，分多步）
+// NoteListPage — 笔记列表（v3-perf-optimized §21.3 全部教学债已修复）
 //
 // 教学型性能债 #1：已修复（keyGenerator 改用 item.id）
 // 教学型性能债 #2：已修复（aboutToDisappear 调 unbindAccessListener 对称解绑）
-// 教学型性能债 #3：在 NoteStore 模块（v3-3 改 V2 @ObservedV2 + @Trace 字段级）
+// 教学型性能债 #3：已修复（NoteStore 改 @ObservedV2 + @Trace；本页用 @Local store）
+//
+// 字段级渲染：dataSource 提供 notifyDataAdd / notifyDataChange / notifyDataDelete
+// 对应 store.add / store.update / store.remove，仅变化的 ListItem 重 build()。
 
 import { Note } from '../data/Note'
 import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
@@ -12,53 +15,20 @@ import { promptAction } from '@kit.ArkUI'
 import { bindAccessListener, unbindAccessListener, requestPermission, GrantStatus } from '../utils/Permissions'
 import { shareNote } from '../utils/ShareNote'
 
-// IDataSource 实现：v1 版做最简实现，每次外部数据改动都整体 reload
-class NoteListSource implements IDataSource {
-  private listeners: DataChangeListener[] = []
-  private items: Note[] = []
-
-  setData(items: Note[]): void {
-    this.items = items
-    // 整体通知（v1 版本，对应教学债 #3 整列表 build()）
-    this.listeners.forEach((l) => l.onDataReloaded())
-  }
-
-  totalCount(): number {
-    return this.items.length
-  }
-
-  getData(index: number): Note {
-    return this.items[index]
-  }
-
-  registerDataChangeListener(listener: DataChangeListener): void {
-    if (this.listeners.indexOf(listener) < 0) {
-      this.listeners.push(listener)
-    }
-  }
-
-  unregisterDataChangeListener(listener: DataChangeListener): void {
-    const i = this.listeners.indexOf(listener)
-    if (i >= 0) {
-      this.listeners.splice(i, 1)
-    }
-  }
-}
-
 @Component
 export struct NoteListPage {
   @Consume('navPathStack') navPathStack: NavPathStack
-  // 教学债 #3 触发点：整对象赋值
-  @State notes: Note[] = []
+  // §21.3 修复教学债 #3：从 @State Note[] 改为 @Local NoteStore（V2 字段级触发）
+  // store.dataSource 是 store 持有的 IDataSource，由 store.add/update/remove 同步触发字段级通知
+  @Local store: NoteStore | null = null
   @State loading: boolean = true
   @State contactsDeniedForbidden: boolean = false
-  private dataSource: NoteListSource = new NoteListSource()
 
   async aboutToAppear(): Promise<void> {
     const store = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
     if (store !== undefined) {
-      this.notes = await store.loadAll()
-      this.dataSource.setData(this.notes)
+      await store.loadAll()
+      this.store = store
     }
     this.loading = false
 
@@ -93,8 +63,7 @@ export struct NoteListPage {
       // 演示用：把"通讯录联系人"作为标签写入新笔记
       // 真实实现请用 @kit.ContactsKit；此处用 mock 数据避免引入额外 SDK
       const mockContacts = ['张三', '李四', '王五']
-      const store = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
-      if (store === undefined) {
+      if (this.store === null) {
         return
       }
       const now = Date.now()
@@ -106,8 +75,8 @@ export struct NoteListPage {
         updatedAt: now,
         tags: mockContacts
       }
-      this.notes = await store.add(newNote)
-      this.dataSource.setData(this.notes)
+      // §21.3 修复：store.add 内部就地 push + notifyAdd（仅新增项 build()，老 ListItem 复用）
+      await this.store.add(newNote)
       this.contactsDeniedForbidden = false
       promptAction.showToast({ message: '已导入 ' + mockContacts.length + ' 位联系人', duration: 1500 })
     } else if (status === 'denied_forbidden') {
@@ -119,8 +88,7 @@ export struct NoteListPage {
   }
 
   private async addNewNote(): Promise<void> {
-    const store = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
-    if (store === undefined) {
+    if (this.store === null) {
       return
     }
     const now = Date.now()
@@ -132,9 +100,8 @@ export struct NoteListPage {
       updatedAt: now,
       tags: []
     }
-    // 教学债 #3：整对象写
-    this.notes = await store.add(newNote)
-    this.dataSource.setData(this.notes)
+    // §21.3 修复：store.add 内部就地 push + notifyAdd（仅新增项 build()）
+    await this.store.add(newNote)
     // 直接进入详情页编辑
     this.navPathStack.pushPathByName('NoteDetailPage', newNote.id)
   }
@@ -258,11 +225,11 @@ export struct NoteListPage {
             .width(40)
             .height(40)
             .margin({ top: 80 })
-        } else if (this.notes.length === 0) {
+        } else if (this.store === null || this.store.notes.length === 0) {
           this.EmptyView()
         } else {
           List({ space: 0 }) {
-            LazyForEach(this.dataSource, (note: Note) => {
+            LazyForEach(this.store!.dataSource, (note: Note) => {
               ListItem() {
                 this.NoteCard(note)
               }
