@@ -9,4 +9,10 @@
     <string name="list_title">我的笔记</string>
     <string name="list_empty">还没有笔记，点击右下角加号新建</string>
     <string name="action_new">新建笔记</string>
+
+    <!-- feat-4 权限 -->
+    <string name="action_camera">拍照插入</string>
+    <string name="perm_camera_rationale">需要相机权限以拍照插入到笔记中。</string>
+    <string name="perm_camera_denied">已拒绝相机权限。可以前往「设置 - 应用 - 和音笔记 - 权限」手动开启。</string>
+    <string name="perm_camera_granted">相机权限已授予，可以开始拍照。</string>
 </resources>
