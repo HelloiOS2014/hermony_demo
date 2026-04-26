@@ -14,16 +14,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.note.R
 import com.example.note.data.Note
 import com.example.note.util.CameraPermissionStatus
+import com.example.note.util.ShareNote
 import com.example.note.util.rememberCameraPermissionState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,6 +68,7 @@ fun NoteDetailScreen(
 
     // feat-4：相机权限状态
     val camera = rememberCameraPermissionState()
+    val ctx = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -76,6 +80,13 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
+                    // feat-6：分享当前编辑中的内容（未保存也能分享，符合 UX 直觉）
+                    IconButton(onClick = { ShareNote.share(ctx, title.trim(), content) }) {
+                        Icon(
+                            Icons.Filled.Share,
+                            contentDescription = stringResource(R.string.action_share),
+                        )
+                    }
                     IconButton(onClick = { camera.requestIfNeeded() }) {
                         Icon(
                             Icons.Filled.PhotoCamera,

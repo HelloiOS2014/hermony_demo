@@ -16,4 +16,8 @@
     <string name="settings_title">Settings</string>
     <string name="settings_dark_mode">Dark mode</string>
     <string name="settings_dark_mode_summary">Follow toggle. Persists across restarts.</string>
+
+    <string name="action_share">Share note</string>
+    <string name="share_chooser_title">Share via…</string>
+    <string name="share_template">【%1$s】\n%2$s\n\n— from Hermony Note</string>
 </resources>

@@ -8,7 +8,8 @@
 package com.example.note.ui
 
 import android.app.Application
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -30,6 +32,7 @@ import com.example.note.R
 import com.example.note.data.Note
 import com.example.note.data.NoteDao
 import com.example.note.data.NoteDatabase
+import com.example.note.util.ShareNote
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -106,6 +109,7 @@ fun NoteListScreen(
             }
         },
     ) { padding ->
+        val ctx = LocalContext.current
         if (notes.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -122,7 +126,14 @@ fun NoteListScreen(
                 contentPadding = PaddingValues(vertical = 8.dp),
             ) {
                 items(items = notes, key = { it.id }) { note ->
-                    NoteRow(note, onClick = { onOpenDetail(note.id) })
+                    NoteRow(
+                        note,
+                        onClick = { onOpenDetail(note.id) },
+                        onLongClick = {
+                            // feat-6：长按列表项 → 分享 chooser
+                            ShareNote.share(ctx, note.title, note.content)
+                        },
+                    )
                     HorizontalDivider()
                 }
             }
@@ -130,13 +141,18 @@ fun NoteListScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NoteRow(note: Note, onClick: () -> Unit) {
+private fun NoteRow(
+    note: Note,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+) {
     val fmt = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(

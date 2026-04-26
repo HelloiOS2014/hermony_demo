@@ -21,4 +21,9 @@
     <string name="settings_dark_mode">深色模式</string>
     <string name="settings_dark_mode_summary">跟随开关切换。重启 App 仍保留。</string>
     <string name="action_toggle_dark">切换深色</string>
+
+    <!-- feat-6 分享 -->
+    <string name="action_share">分享笔记</string>
+    <string name="share_chooser_title">分享到…</string>
+    <string name="share_template">【%1$s】\n%2$s\n\n— 来自 和音笔记</string>
 </resources>
