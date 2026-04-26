@@ -1,29 +1,58 @@
-# hermony_demo
+# v5-arkts-final — §21.5 Android 迁移后的鸿蒙工程
 
-Hermony NEXT 教程项目（[hermony 主仓](../hermony)）的端到端实战 demo 仓库。
+Hermony NEXT 教程 §21.5「Android 应用迁移到 HarmonyOS NEXT」配套鸿蒙迁移版。
 
-## 7 个分支地图
+基于 v1.0.0 fork，按 `v5-android-source` 分支 7 个 `[feat-N]` commit 一一对应：
 
-| 分支 | tag | 说明 |
-|---|---|---|
-| `main` | - | 默认分支，指向最新（v5-arkts-final）|
-| `v1-single` | `v1.0.0` | §21.1 单端笔记（ArkUI + V1 @State + RDB + 权限），含 3 处教学型性能债 |
-| `v2-multidevice` | `v2.0.0` | §21.2 多端协同（v1 base + 流转 + 分布式数据 + 响应式断点）|
-| `v3-perf-baseline` | `v3.0.0-baseline` | §21.3 性能优化前（与 v1 等价 + hiTraceMeter 打点）|
-| `v3-perf-optimized` | `v3.0.0-optimized` | §21.3 性能优化后（修复 3 处教学型性能债）|
-| `v4-test-ci` | `v4.0.0` | §21.4 测试 + CI（v2 base + Hypium + AGC pipeline yaml）|
-| `v5-arkts-final` | `v5.0.0` | §21.5 Android 迁移后的鸿蒙工程 |
-| `v5-android-source` | `v5.0.0` | §21.5 Android 原工程（与 v5-arkts-final commit 一一对应）|
+- 7 个鸿蒙 commit 的 message 与 Android 仓 commit 完全对应（同 `[feat-N]` 编号）
+- 每个 commit 改动 1-2 文件 + 加详细 Android↔HarmonyOS 映射注释（页面顶部大块）
 
-## 使用方式
+## 工程栈（沿用 v1 鸿蒙工程）
+
+- **ArkTS** + **ArkUI**（声明式 UI）
+- **V1 装饰器**（@State / @Observed / @ObjectLink / @Provide / @Consume）
+- **relationalStore**（持久化）
+- **preferences**（用户偏好）
+- **shareKit**（系统分享）
+- **AbilityKit + abilityAccessCtrl**（权限）
+
+## 7 个 `[feat-N]` commit 单元（与 v5-android-source 一一对应）
+
+| 编号 | 功能 | Android 实现要点 | HarmonyOS 实现要点 |
+|---|---|---|---|
+| `[feat-1]` | 笔记列表渲染 | LazyColumn + ViewModel StateFlow | List + LazyForEach + AppStorage NoteStore |
+| `[feat-2]` | 笔记详情页 | NavHost composable("detail/{id}") | Navigation + NavPathStack pushPathByName |
+| `[feat-3]` | RDB 持久化 | Room @Entity + DAO Flow | relationalStore.RdbStore + 手写 SQL |
+| `[feat-4]` | 权限申请 | runtime permission + 拒绝兜底 | atManager.requestPermissionsFromUser + ACL |
+| `[feat-5]` | 主题切换 | values-night + setDefaultNightMode | resources/dark + setColorMode |
+| `[feat-6]` | 分享笔记 | Intent.ACTION_SEND + createChooser | systemShare.ShareController + utd.UDT |
+| `[feat-7]` | 设置页 | SettingsScreen + DataStore | SettingsPage + preferences |
+
+每个 commit 的 hash 见 `docs/feature-commits-harmony.txt`。
+
+## 双仓 commit pair
+
+详见 [`docs/feature-commit-map.md`](./docs/feature-commit-map.md)（功能编号 / Android hash / 鸿蒙 hash 三列 + 关键 API 对照 cheat sheet）。
+
+自动重生成：
 
 ```bash
-git clone git@github.com:HelloiOS2014/hermony_demo.git
-cd hermony_demo
-git checkout v1-single  # 或其他分支
-# 用 DevEco Studio 打开（鸿蒙分支）/ Android Studio 打开（v5-android-source）
+bash scripts/cross-repo-feature-map.sh   # 输出 docs/feature-commit-map-auto.md
 ```
 
-## 教程
+## tag
 
-每个分支对应教程站 §21.x 章节。教程仓地址 TBD。
+`v5.0.0`：与 §21.5 教程章节绑定。`v5-android-source` 同步打 tag。
+
+## v5-android-source 分支
+
+§21.5 Android 原工程，与本分支 commit 一一对应。
+
+```bash
+git checkout v5-android-source
+# 用 Android Studio 打开
+```
+
+---
+
+完整 7 分支地图请见 [`main` 分支 README](https://github.com/HelloiOS2014/hermony_demo/blob/main/README.md)。
