@@ -1,5 +1,44 @@
 // NoteDetailPage — 笔记详情 / 编辑页
 //
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ §21.5 [feat-2] Android → HarmonyOS NEXT 迁移要点                      ║
+// ╠══════════════════════════════════════════════════════════════════════╣
+// ║ Android 原工程（v5-android-source 分支 [feat-2]）                     ║
+// ║   - NavHost(startDestination="list") + composable("detail/{id}",     ║
+// ║       arguments=listOf(navArgument("id"){type=NavType.LongType}))    ║
+// ║   - 通过 nav.navigate("detail/$id") 进入                              ║
+// ║   - rememberSaveable 持有 title/content 编辑态，跨配置变更存活          ║
+// ║   - 顶部「保存」→ viewModel.update + nav.popBackStack                 ║
+// ║                                                                      ║
+// ║ HarmonyOS 对应实现（本文件）                                          ║
+// ║   - 入口由 NoteListPage 的 Navigation 组件触发：                       ║
+// ║       navPathStack.pushPathByName('NoteDetailPage', noteId)          ║
+// ║   - 取参：navPathStack.getParamByName('NoteDetailPage')[0] as string ║
+// ║   - 编辑态用 @State title/content/dirty，状态由 V1 框架托管            ║
+// ║   - 「保存」按钮 → store.update(...) + navPathStack.pop()            ║
+// ║   - 物理返回触发 onWillBack（自动保存）                               ║
+// ║                                                                      ║
+// ║ 关键映射                                                              ║
+// ║   Intent.putExtra(id) + startActivity()                              ║
+// ║       ↔  navPathStack.pushPathByName(name, param)                    ║
+// ║   intent.getLongExtra("id", -1)                                      ║
+// ║       ↔  navPathStack.getParamByName(name)                            ║
+// ║   nav.popBackStack()                                                  ║
+// ║       ↔  navPathStack.pop()                                           ║
+// ║   rememberSaveable                                                   ║
+// ║       ↔  @State + PersistentStorage（或 V2 @Local）                   ║
+// ║   ViewModel 单例（Activity 作用域）                                    ║
+// ║       ↔  @Consume('navPathStack') + AppStorage 全局 NoteStore         ║
+// ║                                                                      ║
+// ║ 注意点（迁移踩坑）                                                    ║
+// ║   1. Android NavType.LongType 强类型；ArkTS getParamByName 返回         ║
+// ║      Object[]，需要 `as string` 二次断言（Note.id 在鸿蒙工程是 string）║
+// ║   2. Compose LaunchedEffect(noteId) → suspend get(id)                ║
+// ║      在 ArkTS 用 aboutToAppear 同步 + Promise；不可阻塞 UI 线程        ║
+// ║   3. Compose rememberSaveable 内置 Bundle 序列化；ArkTS 需要手动用      ║
+// ║      PersistentStorage 或 @LocalStorageProp 实现等价语义                ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+//
 // 路由参数：noteId: string —— 通过 navPathStack.pushPathByName('NoteDetailPage', noteId)
 // 保存策略：
 //   - "保存"按钮 → 写 RDB + 触发 store.update（整对象写，对应教学债 #3）

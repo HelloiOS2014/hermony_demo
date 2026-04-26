@@ -1,5 +1,18 @@
 // MainPage — Navigation 容器（NavPathStack）
 //
+// §21.5 [feat-2] 迁移注释：
+//   Android 一侧的路由表写在 MainActivity 的 NavHost 里：
+//       NavHost(navController = nav, startDestination = "list") {
+//         composable("list")               { NoteListScreen(...) }
+//         composable("detail/{id}")        { NoteDetailScreen(...) }
+//         composable("settings")           { SettingsScreen(...) }   // [feat-7]
+//       }
+//   HarmonyOS NEXT 由 Navigation + NavPathStack + @Builder PageMap 表达：
+//       Navigation(this.navPathStack) { NoteListPage() }              // 默认目的地
+//         .navDestination(this.PageMap)                               // name → 组件
+//   两边在概念上完全对应：startDestination ↔ 默认子组件，
+//   composable("name") ↔ PageMap 的 if 分支。
+//
 // 路由结构：
 //   NoteListPage（默认）
 //   ├── NoteDetailPage  参数 { noteId: string }
