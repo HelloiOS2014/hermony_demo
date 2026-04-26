@@ -185,9 +185,9 @@ NoteStore.add(note)
 ```bash
 git clone git@github.com:HelloiOS2014/hermony_demo.git
 cd hermony_demo
-git checkout v1-single
+git checkout v3-perf-optimized
 # 用 DevEco Studio 5.x 打开（File → Open → 选 hermony_demo 根目录）
-# Sync 后真机或模拟器跑
+# Sync 后真机或模拟器跑；用 hiTraceMeter + Profiler 抓 noteList.scrollFrame trace 对照 perf-summary.md
 ```
 
 ## 教程章节对应关系
