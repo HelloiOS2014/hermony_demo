@@ -9,6 +9,8 @@
 import { Note } from '../data/Note'
 import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
 import { promptAction } from '@kit.ArkUI'
+import { common } from '@kit.AbilityKit'
+import { shareNote } from '../utils/ShareNote'
 
 @Component
 export struct NoteDetailPage {
@@ -78,6 +80,27 @@ export struct NoteDetailPage {
     this.navPathStack.pop()
   }
 
+  private async share(): Promise<void> {
+    const store = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
+    if (store === undefined || this.noteId === '') {
+      return
+    }
+    // 分享前先把当前编辑内容固化（防"看到的不是分享出去的"）
+    if (this.dirty) {
+      await this.save()
+    }
+    const note = store.getById(this.noteId)
+    if (note === undefined) {
+      return
+    }
+    const ctx = getContext(this) as common.UIAbilityContext
+    try {
+      await shareNote(ctx, note)
+    } catch (_e) {
+      promptAction.showToast({ message: '分享失败，请稍后重试', duration: 1500 })
+    }
+  }
+
   private async deleteNote(): Promise<void> {
     const store = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
     if (store === undefined || this.noteId === '') {
@@ -99,6 +122,11 @@ export struct NoteDetailPage {
             .padding(8)
             .onClick(() => this.saveAndBack())
           Blank()
+          Text($r('app.string.action_share'))
+            .fontSize(15)
+            .fontColor($r('app.color.accent'))
+            .padding(8)
+            .onClick(() => this.share())
           Text($r('app.string.action_delete'))
             .fontSize(15)
             .fontColor($r('app.color.danger'))

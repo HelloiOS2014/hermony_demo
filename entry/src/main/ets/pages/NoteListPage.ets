@@ -15,6 +15,7 @@ import { genNoteId } from '../data/Note'
 import { common, Permissions as AbilityPermissions } from '@kit.AbilityKit'
 import { promptAction } from '@kit.ArkUI'
 import { bindAccessListener, requestPermission, GrantStatus } from '../utils/Permissions'
+import { shareNote } from '../utils/ShareNote'
 
 // IDataSource 实现：v1 版做最简实现，每次外部数据改动都整体 reload
 class NoteListSource implements IDataSource {
@@ -196,6 +197,17 @@ export struct NoteListPage {
     .onClick(() => {
       this.navPathStack.pushPathByName('NoteDetailPage', note.id)
     })
+    .gesture(
+      LongPressGesture({ repeat: false, duration: 500 })
+        .onAction(async () => {
+          const ctx = getContext(this) as common.UIAbilityContext
+          try {
+            await shareNote(ctx, note)
+          } catch (_e) {
+            promptAction.showToast({ message: '分享失败，请稍后重试', duration: 1500 })
+          }
+        })
+    )
   }
 
   build() {
