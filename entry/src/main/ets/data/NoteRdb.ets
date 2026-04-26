@@ -1,0 +1,105 @@
+// NoteRdb — relationalStore 封装
+// v1 版表结构与 §21.3 / §21.4 / §21.5 全部兼容；v2 起会在 storeConfig 上加 isSearchable 等分布式字段。
+
+import { relationalStore } from '@kit.ArkData'
+import { common } from '@kit.AbilityKit'
+import { hilog } from '@kit.PerformanceAnalysisKit'
+import { Note } from './Note'
+
+const TAG = 'NoteRdb'
+const DOMAIN = 0xFF00
+
+const STORE_CONFIG: relationalStore.StoreConfig = {
+  name: 'hermony_note_v1.db',
+  securityLevel: relationalStore.SecurityLevel.S1
+}
+
+const TABLE = 'notes'
+const SQL_CREATE = `CREATE TABLE IF NOT EXISTS ${TABLE} (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  updatedAt INTEGER NOT NULL,
+  tags TEXT NOT NULL
+)`
+
+export class NoteRdb {
+  private store: relationalStore.RdbStore | null = null
+
+  async init(context: common.UIAbilityContext): Promise<void> {
+    this.store = await relationalStore.getRdbStore(context, STORE_CONFIG)
+    await this.store.executeSql(SQL_CREATE)
+    hilog.info(DOMAIN, TAG, 'init done')
+  }
+
+  private require(): relationalStore.RdbStore {
+    if (this.store === null) {
+      throw new Error('NoteRdb not init')
+    }
+    return this.store
+  }
+
+  async insert(note: Note): Promise<void> {
+    const store = this.require()
+    const bucket: relationalStore.ValuesBucket = {
+      id: note.id,
+      title: note.title,
+      content: note.content,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+      tags: JSON.stringify(note.tags)
+    }
+    await store.insert(TABLE, bucket)
+  }
+
+  async update(note: Note): Promise<void> {
+    const store = this.require()
+    const bucket: relationalStore.ValuesBucket = {
+      title: note.title,
+      content: note.content,
+      updatedAt: note.updatedAt,
+      tags: JSON.stringify(note.tags)
+    }
+    const predicates = new relationalStore.RdbPredicates(TABLE)
+    predicates.equalTo('id', note.id)
+    await store.update(bucket, predicates)
+  }
+
+  async deleteById(id: string): Promise<void> {
+    const store = this.require()
+    const predicates = new relationalStore.RdbPredicates(TABLE)
+    predicates.equalTo('id', id)
+    await store.delete(predicates)
+  }
+
+  async queryAll(): Promise<Note[]> {
+    const store = this.require()
+    const predicates = new relationalStore.RdbPredicates(TABLE)
+    predicates.orderByDesc('updatedAt')
+    const rs = await store.query(predicates,
+      ['id', 'title', 'content', 'createdAt', 'updatedAt', 'tags'])
+    const list: Note[] = []
+    while (rs.goToNextRow()) {
+      list.push({
+        id: rs.getString(rs.getColumnIndex('id')),
+        title: rs.getString(rs.getColumnIndex('title')),
+        content: rs.getString(rs.getColumnIndex('content')),
+        createdAt: rs.getLong(rs.getColumnIndex('createdAt')),
+        updatedAt: rs.getLong(rs.getColumnIndex('updatedAt')),
+        tags: JSON.parse(rs.getString(rs.getColumnIndex('tags'))) as string[]
+      })
+    }
+    rs.close()
+    return list
+  }
+
+  async count(): Promise<number> {
+    const store = this.require()
+    const predicates = new relationalStore.RdbPredicates(TABLE)
+    const rs = await store.query(predicates, ['id'])
+    const c = rs.rowCount
+    rs.close()
+    return c
+  }
+}
