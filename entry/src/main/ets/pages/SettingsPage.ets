@@ -3,12 +3,22 @@
 // 三项设置：
 //   1. themeMode  light / dark / system  → 立即应用 + UserPrefs.flush()
 //   2. defaultTags 逗号分隔输入框，新建笔记时会预填
-//   3. syncEnabled v1 默认关闭 + 灰显（v2-multidevice 起接 distributedDataObject）
+//   3. syncEnabled v2-multidevice 起：默认 false；用户开启后调用
+//      DistributedNoteStore.joinSession 加入分布式会话（关闭走 leaveSession）
 
 import { UserPrefs } from '../data/Note'
 import { UserPrefsStore } from '../data/UserPrefsStore'
 import { ConfigurationConstant, common } from '@kit.AbilityKit'
 import { promptAction } from '@kit.ArkUI'
+import {
+  DistributedNoteStore,
+  DISTRIBUTED_STORE_KEY,
+  DistributedSyncListener
+} from '../data/DistributedNoteStore'
+
+// v2-multidevice：sessionId 简化为常量（demo 无账号体系）
+// 真实业务请用 `<userId>_notes` 这种业务级唯一标识
+const SYNC_SESSION_ID = 'hermony_notes_session'
 
 @Component
 export struct SettingsPage {
@@ -45,6 +55,31 @@ export struct SettingsPage {
     }
     await store.save(next)
     AppStorage.setOrCreate('themeMode', this.themeMode)
+  }
+
+  // v2-multidevice：同步开关切换 → 调用分布式 store 加入 / 退出会话
+  // 开启 → joinSession + 把本地笔记 mirror 给对端
+  // 关闭 → leaveSession（本地缓存保留，但不再 fan-out）
+  private applySyncToggle(on: boolean): void {
+    const distStore = AppStorage.get<DistributedNoteStore>(DISTRIBUTED_STORE_KEY)
+    if (distStore === undefined) {
+      promptAction.showToast({ message: '分布式 store 未初始化', duration: 1500 })
+      return
+    }
+    if (on) {
+      const listener: DistributedSyncListener = {
+        onChange: (_notes, _fields) => {
+          // 设置页本身不消费 onChange；列表页 aboutToAppear 会重绑 listener
+        },
+        onStatus: (_id, _status) => {}
+      }
+      distStore.joinSession(SYNC_SESSION_ID, listener)
+      distStore.mirrorLocalToRemote()
+      promptAction.showToast({ message: '同步已开启', duration: 1500 })
+    } else {
+      distStore.leaveSession()
+      promptAction.showToast({ message: '同步已关闭', duration: 1500 })
+    }
   }
 
   private applyColorMode(mode: 'light' | 'dark' | 'system'): void {
@@ -151,7 +186,9 @@ export struct SettingsPage {
                   })
               }
 
-              // 同步开关（v1 灰显）
+              // 同步开关（v2-multidevice 启用）
+              // 默认 false：用户主动开启后才加入分布式会话；UserPrefs 持久化，
+              // 重启后 EntryAbility.onCreate 会按持久化值自动 rejoin（见 EntryAbility）
               Column() {
                 Text($r('app.string.settings_sync'))
                   .fontSize(13)
@@ -159,16 +196,24 @@ export struct SettingsPage {
                   .width('100%')
                   .padding({ left: 16, top: 4, bottom: 8 })
                 Row() {
-                  Text('多端同步（v2 起支持）')
-                    .fontSize(15)
-                    .fontColor($r('app.color.primary_text'))
-                    .layoutWeight(1)
-                    .opacity(0.5)
+                  Column({ space: 2 }) {
+                    Text('多端同步')
+                      .fontSize(15)
+                      .fontColor($r('app.color.primary_text'))
+                      .width('100%')
+                    Text(this.syncEnabled
+                      ? 'distributedDataObject 已加入会话'
+                      : '关闭中（默认）；开启后笔记跨设备同步')
+                      .fontSize(11)
+                      .fontColor($r('app.color.secondary_text'))
+                      .width('100%')
+                  }
+                  .layoutWeight(1)
                   Toggle({ type: ToggleType.Switch, isOn: this.syncEnabled })
-                    .enabled(false)   // v1 始终灰显；v2-multidevice 启用
-                    .onChange((on) => {
+                    .onChange(async (on) => {
                       this.syncEnabled = on
-                      this.persist()
+                      await this.persist()
+                      this.applySyncToggle(on)
                     })
                 }
                 .width('100%')
