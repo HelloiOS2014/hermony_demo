@@ -1,0 +1,4 @@
+# §21.5 v5-arkts-final 7 个 [feat-N] commit hash 索引
+# 与 v5-android-source 分支 7 个 commit 一一对应
+# 自动追加（每个 commit 完成后由 subagent 写入）
+

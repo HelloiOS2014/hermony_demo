@@ -1,5 +1,34 @@
 // NoteListPage — 笔记列表
 //
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ §21.5 [feat-1] Android → HarmonyOS NEXT 迁移要点                      ║
+// ╠══════════════════════════════════════════════════════════════════════╣
+// ║ Android 原工程（v5-android-source 分支）                              ║
+// ║   - MainActivity (ComponentActivity) + setContent { ... }            ║
+// ║   - Jetpack Compose Scaffold + LazyColumn { items(key=id) {} }       ║
+// ║   - NoteListViewModel : ViewModel，notes 是 StateFlow<List<Note>>    ║
+// ║   - 5 条预置笔记（feat-1 为内存数据）                                  ║
+// ║                                                                      ║
+// ║ HarmonyOS 对应实现（本文件）                                          ║
+// ║   - EntryAbility（UIAbility）+ windowStage.loadContent('MainPage')   ║
+// ║   - @Component NoteListPage + List + LazyForEach(...keyGenerator)    ║
+// ║   - NoteStore(@Observed) 通过 AppStorage.setOrCreate 全局共享         ║
+// ║   - 5 条预置笔记由 NoteStore.bootstrap 在首启时插入 RDB              ║
+// ║                                                                      ║
+// ║ 关键映射                                                              ║
+// ║   ComponentActivity     ↔  UIAbility                                  ║
+// ║   setContent { ... }    ↔  windowStage.loadContent(pageUrl)          ║
+// ║   LazyColumn(items,key) ↔  List + LazyForEach(items, item=>item, kg) ║
+// ║   ViewModel + Flow      ↔  AppStorage 单例 + @Observed/@ObjectLink   ║
+// ║   FloatingActionButton  ↔  Button 在 RelativeContainer 内绝对定位      ║
+// ║                                                                      ║
+// ║ 注意点（迁移踩坑）                                                    ║
+// ║   1. Compose key 直接传 stable id；ArkTS LazyForEach 必须显式实现     ║
+// ║      keyGenerator，且整数 index 会导致中间增删时大面积重建（教学债 #1）║
+// ║   2. ViewModel 跨 Activity 用 viewModelStoreOwner；ArkTS 跨页共享统一  ║
+// ║      用 AppStorage（key 由 NOTE_STORE_KEY 常量化）                    ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+//
 // ⚠️ 教学型性能债 #1（§21.3 演示修复用）：
 //   LazyForEach 的 keyGenerator 用 index 作 key。当列表中间删除 / 插入时，所有
 //   后续 item 的 index 变化 → 所有 key 失效 → 全部 item 重建。
