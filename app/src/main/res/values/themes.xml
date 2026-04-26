@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Light 主题（默认）。Compose 应用大部分样式在 ui/theme/ 中定义，
+  这里只为 splash / system bar 提供基础 AppTheme。
+-->
+<resources>
+    <style name="Theme.HermonyNote" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#FFFFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

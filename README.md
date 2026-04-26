@@ -1,29 +1,54 @@
-# hermony_demo
+# v5-android-source — §21.5 Android 原工程
 
-Hermony NEXT 教程项目（[hermony 主仓](../hermony)）的端到端实战 demo 仓库。
+Hermony NEXT 教程 §21.5「Android 应用迁移到 HarmonyOS NEXT」配套 Android 原工程。
 
-## 7 个分支地图
+## 工程栈
 
-| 分支 | tag | 说明 |
+- **Kotlin** + **Jetpack Compose**（UI）
+- **Material3**（组件库）
+- **Room**（持久化，feat-3 引入）
+- **DataStore Preferences**（设置 / 主题持久化，feat-5/feat-7 引入）
+- **Navigation Compose**（多页面，feat-2 引入）
+
+## 7 个 [feat-N] commit 单元
+
+与 `v5-arkts-final` 分支的 7 个鸿蒙迁移 commit 一一对应（同 `[feat-N]` 编号）：
+
+| 编号 | 功能 | 用户可见行为 |
 |---|---|---|
-| `main` | - | 默认分支，指向最新（v5-arkts-final）|
-| `v1-single` | `v1.0.0` | §21.1 单端笔记（ArkUI + V1 @State + RDB + 权限），含 3 处教学型性能债 |
-| `v2-multidevice` | `v2.0.0` | §21.2 多端协同（v1 base + 流转 + 分布式数据 + 响应式断点）|
-| `v3-perf-baseline` | `v3.0.0-baseline` | §21.3 性能优化前（与 v1 等价 + hiTraceMeter 打点）|
-| `v3-perf-optimized` | `v3.0.0-optimized` | §21.3 性能优化后（修复 3 处教学型性能债）|
-| `v4-test-ci` | `v4.0.0` | §21.4 测试 + CI（v2 base + Hypium + AGC pipeline yaml）|
-| `v5-arkts-final` | `v5.0.0` | §21.5 Android 迁移后的鸿蒙工程 |
-| `v5-android-source` | `v5.0.0` | §21.5 Android 原工程（与 v5-arkts-final commit 一一对应）|
+| `[feat-1]` | 笔记列表渲染 | LazyColumn 展示 5 条预置笔记 + 空态 |
+| `[feat-2]` | 笔记详情页 | NavHost 跳转 + 编辑标题 / 正文 + 保存 |
+| `[feat-3]` | RDB 持久化 | Room @Entity + DAO Flow，重启保留数据 |
+| `[feat-4]` | 权限申请 | runtime CAMERA 权限 + 拒绝兜底 UI |
+| `[feat-5]` | 主题切换 | values-night + setDefaultNightMode + DataStore 持久化 |
+| `[feat-6]` | 分享笔记 | Intent.ACTION_SEND + Intent.createChooser |
+| `[feat-7]` | 设置页 | SettingsScreen + DataStore 持久化字号 / 排序 |
 
-## 使用方式
+每个 commit 的 hash 见 `docs/feature-commits-android.txt`。
+
+## 构建
 
 ```bash
-git clone git@github.com:HelloiOS2014/hermony_demo.git
-cd hermony_demo
-git checkout v1-single  # 或其他分支
-# 用 DevEco Studio 打开（鸿蒙分支）/ Android Studio 打开（v5-android-source）
+./gradlew :app:assembleDebug          # 真机调试包
+./gradlew :app:lint                    # Lint 检查
 ```
 
-## 教程
+> 教学项目，无 Gradle wrapper（学员请用 Android Studio 自带 wrapper 或本机 `gradle`）。
 
-每个分支对应教程站 §21.x 章节。教程仓地址 TBD。
+## 与鸿蒙版（v5-arkts-final）对照
+
+```bash
+# 仓内：
+git log v5-android-source --grep '^\[feat-' --oneline
+git log v5-arkts-final  --grep '^\[feat-' --oneline
+```
+
+完整映射表：`docs/feature-commit-map.md`（在 v5-arkts-final 分支生成）。
+
+## tag
+
+`v5.0.0`：与 §21.5 教程章节绑定。
+
+---
+
+完整 7 分支地图请见 [`main` 分支 README](https://github.com/HelloiOS2014/hermony_demo/blob/main/README.md)。

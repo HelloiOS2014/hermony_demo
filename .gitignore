@@ -1,0 +1,13 @@
+# Android Gradle 工程标准忽略
+.gradle/
+build/
+.idea/
+local.properties
+*.iml
+captures/
+.cxx/
+.externalNativeBuild/
+.kotlin/
+
+# macOS
+.DS_Store
