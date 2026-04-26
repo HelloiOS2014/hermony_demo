@@ -3,11 +3,11 @@
 
 import noteRdbTest from './Note.test'
 import userPrefsStoreTest from './UserPrefs.test'
-
-// [v4-2] 在 commit 时再追加 UiTestList 注册
-// import uiTestList from './UiTestList.test'
+import uiTestList from './UiTestList.test'
 
 export default function testsuite() {
   noteRdbTest()
   userPrefsStoreTest()
+  // [v4-2] UI 自动化套（driver.findComponent + click + assertVisible 完整流程）
+  uiTestList()
 }
