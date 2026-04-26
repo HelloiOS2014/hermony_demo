@@ -5,12 +5,18 @@
 //   - "保存"按钮 → 写 RDB + 触发 store.update（整对象写，对应教学债 #3）
 //   - 物理返回 → 自动保存（避免用户编辑后误退）
 //   - 空标题自动用首行内容前 20 字代替
+//
+// v2-multidevice 增量：
+//   - 编辑态实时镜像到 AppStorage[CONTINUED_DRAFT_KEY]，让 EntryAbility.onContinue
+//     / onSaveState 能拿到当前正在编辑的草稿（流转走系统级回调，无法直接读 @State）
+//   - aboutToAppear 优先读 CONTINUED_DRAFT_KEY 兜底（被流转拉起 + noteId 命中时）
 
 import { Note } from '../data/Note'
 import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
 import { promptAction } from '@kit.ArkUI'
 import { common } from '@kit.AbilityKit'
 import { shareNote } from '../utils/ShareNote'
+import EntryAbility, { ContinuedDraft, CONTINUED_DRAFT_KEY } from '../entryability/EntryAbility'
 
 @Component
 export struct NoteDetailPage {
@@ -22,6 +28,7 @@ export struct NoteDetailPage {
   @State createdAt: number = 0
   @State dirty: boolean = false
   @State loading: boolean = true
+  @State continuedFromRemote: boolean = false  // v2：标识当前数据来源是流转包
 
   aboutToAppear(): void {
     const params = this.navPathStack.getParamByName('NoteDetailPage') as Object[]
@@ -30,12 +37,33 @@ export struct NoteDetailPage {
     this.loadNote(id)
   }
 
+  aboutToDisappear(): void {
+    // 离开编辑页 → 清掉流转草稿镜像，避免下次 onContinue 误打包过期数据
+    EntryAbility.clearContinuedDraft()
+  }
+
   private loadNote(id: string): void {
     const store = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
     if (store === undefined) {
       this.loading = false
       return
     }
+
+    // v2-multidevice：先看 AppStorage 里有没有流转过来的草稿（noteId 必须命中）
+    const draft = AppStorage.get<ContinuedDraft>(CONTINUED_DRAFT_KEY)
+    if (draft !== undefined && draft.noteId === id && draft.noteId !== '') {
+      this.title = draft.title
+      this.content = draft.content
+      this.tagsText = draft.tags.join(',')
+      this.continuedFromRemote = true
+      const existing = store.getById(id)
+      this.createdAt = existing !== undefined ? existing.createdAt : Date.now()
+      this.dirty = true   // 默认标脏 → 退出时自动落盘
+      this.loading = false
+      this.mirrorEditingState()
+      return
+    }
+
     const n = store.getById(id)
     if (n !== undefined) {
       this.title = n.title
@@ -44,12 +72,29 @@ export struct NoteDetailPage {
       this.createdAt = n.createdAt
     }
     this.loading = false
+    this.mirrorEditingState()
   }
 
   private parseTags(text: string): string[] {
     return text.split(/[,，]/)
       .map((t) => t.trim())
       .filter((t) => t.length > 0)
+  }
+
+  // v2-multidevice：把当前编辑态镜像到 AppStorage[CONTINUED_DRAFT_KEY]
+  // EntryAbility.onContinue / onSaveState 在系统回调线程读这份镜像
+  private mirrorEditingState(cursor: number = 0): void {
+    if (this.noteId === '') {
+      return
+    }
+    EntryAbility.updateContinuedDraft({
+      noteId: this.noteId,
+      title: this.title,
+      content: this.content,
+      tags: this.parseTags(this.tagsText),
+      cursor,
+      schemaVersion: 1
+    })
   }
 
   private async save(): Promise<void> {
@@ -64,12 +109,19 @@ export struct NoteDetailPage {
       id: this.noteId,
       title: finalTitle,
       content: this.content,
-      createdAt: this.createdAt,
+      createdAt: this.createdAt > 0 ? this.createdAt : Date.now(),
       updatedAt: Date.now(),
       tags: this.parseTags(this.tagsText)
     }
-    await store.update(note)
+    // 流转过来但本地 RDB 不存在 → 走 add 而非 update（保证笔记落盘）
+    const existing = store.getById(this.noteId)
+    if (existing === undefined) {
+      await store.add(note)
+    } else {
+      await store.update(note)
+    }
     this.dirty = false
+    this.continuedFromRemote = false
     promptAction.showToast({ message: '已保存', duration: 1200 })
   }
 
@@ -141,6 +193,23 @@ export struct NoteDetailPage {
         .width('100%')
         .padding({ left: 8, right: 8, top: 4, bottom: 4 })
 
+        // v2-multidevice：流转过来的草稿 banner，提醒用户"这是从其他设备接过来的编辑"
+        if (this.continuedFromRemote) {
+          Row({ space: 8 }) {
+            Text('🔁')
+              .fontSize(14)
+            Text('已从其他设备接续，保存后会落到本机 RDB')
+              .fontSize(12)
+              .fontColor($r('app.color.accent'))
+              .layoutWeight(1)
+          }
+          .width('92%')
+          .padding(10)
+          .backgroundColor('#E8F4FD')
+          .borderRadius(8)
+          .margin({ left: 16, right: 16, bottom: 6 })
+        }
+
         if (this.loading) {
           LoadingProgress()
             .width(40)
@@ -156,6 +225,7 @@ export struct NoteDetailPage {
             .onChange((v) => {
               this.title = v
               this.dirty = true
+              this.mirrorEditingState()
             })
 
           // 标签
@@ -167,6 +237,7 @@ export struct NoteDetailPage {
             .onChange((v) => {
               this.tagsText = v
               this.dirty = true
+              this.mirrorEditingState()
             })
 
           Divider()
@@ -184,6 +255,7 @@ export struct NoteDetailPage {
             .onChange((v) => {
               this.content = v
               this.dirty = true
+              this.mirrorEditingState(v.length)
             })
         }
       }
