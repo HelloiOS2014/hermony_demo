@@ -42,6 +42,16 @@
           "abilities": ["EntryAbility"],
           "when": "inuse"
         }
+      },
+      // v2-multidevice：分布式数据同步权限
+      // distributedDataObject + 自由流转 都需要此权限；DEVICE 间软总线通信靠它放行
+      {
+        "name": "ohos.permission.DISTRIBUTED_DATASYNC",
+        "reason": "$string:perm_distributed_reason",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "inuse"
+        }
       }
     ]
   }

@@ -5,6 +5,7 @@
     { "name": "app_name", "value": "Hermony Note" },
     { "name": "perm_contacts_reason", "value": "Import contacts as note tags" },
     { "name": "perm_camera_reason", "value": "Capture photos for notes" },
+    { "name": "perm_distributed_reason", "value": "Sync notes and continue editing across devices" },
     { "name": "title_note_list", "value": "My Notes" },
     { "name": "title_note_detail", "value": "Note Detail" },
     { "name": "title_settings", "value": "Settings" },

@@ -5,6 +5,7 @@
     { "name": "app_name", "value": "Hermony 笔记" },
     { "name": "perm_contacts_reason", "value": "导入通讯录联系人到笔记标签" },
     { "name": "perm_camera_reason", "value": "拍摄附图加入笔记" },
+    { "name": "perm_distributed_reason", "value": "跨设备同步笔记和接续编辑" },
     { "name": "title_note_list", "value": "我的笔记" },
     { "name": "title_note_detail", "value": "笔记详情" },
     { "name": "title_settings", "value": "设置" },
