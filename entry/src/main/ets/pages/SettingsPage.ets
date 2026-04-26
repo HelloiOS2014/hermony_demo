@@ -4,6 +4,48 @@
 //   1. themeMode  light / dark / system  → 立即应用 + UserPrefs.flush()
 //   2. defaultTags 逗号分隔输入框，新建笔记时会预填
 //   3. syncEnabled v1 默认关闭 + 灰显（v2-multidevice 起接 distributedDataObject）
+//
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ §21.5 [feat-7] Android → HarmonyOS NEXT 迁移要点                      ║
+// ╠══════════════════════════════════════════════════════════════════════╣
+// ║ Android 原工程（v5-android-source 分支 [feat-7]）                     ║
+// ║   - ui/SettingsScreen.kt：                                            ║
+// ║       SettingsViewModel(AndroidViewModel) 暴露 darkMode/fontScale/    ║
+// ║       sortDesc 三个 StateFlow                                          ║
+// ║   - SwitchRow（Material3 Switch）+ SliderRow（Slider 0.85~1.30 步进） ║
+// ║   - DataStore Preferences 即时写入，重启保留                          ║
+// ║   - NavHost composable("settings") 注册                              ║
+// ║                                                                      ║
+// ║ HarmonyOS 对应实现（本文件）                                          ║
+// ║   - 通过 navPathStack.pushPathByName('SettingsPage') 进入             ║
+// ║   - 直接调用 UserPrefsStore.set...() / flush() 持久化                 ║
+// ║   - Toggle / TextInput / Button 组合 ArkUI 组件                       ║
+// ║   - 主题切换走 UIAbility.context.setColorMode（见 [feat-5]）         ║
+// ║                                                                      ║
+// ║ 关键映射                                                              ║
+// ║   PreferenceFragmentCompat（旧）/ SettingsScreen Composable           ║
+// ║       ↔  @Component SettingsPage                                      ║
+// ║   ViewModel + StateFlow                                               ║
+// ║       ↔  @State + UserPrefsStore（手动 read 然后 flush）              ║
+// ║   Material3 Switch                                                    ║
+// ║       ↔  Toggle({ type: ToggleType.Switch })                          ║
+// ║   Material3 Slider                                                    ║
+// ║       ↔  Slider({ value, min, max, step })                            ║
+// ║   NavHost composable("settings")                                      ║
+// ║       ↔  Navigation + navDestination + PageMap('SettingsPage')        ║
+// ║   DataStore Preferences (suspend write)                               ║
+// ║       ↔  preferences.put + preferences.flush                          ║
+// ║                                                                      ║
+// ║ 注意点（迁移踩坑）                                                    ║
+// ║   1. DataStore 写入在 Coroutine 内自动 fsync；ArkTS preferences 必须    ║
+// ║      显式 await flush()，否则进程崩溃可能丢数据                       ║
+// ║   2. Compose 重组细粒度（rememberSaveable + StateFlow）；ArkTS @State ║
+// ║      字段级触发也很轻，但跨组件共享要走 AppStorage / @Provide-@Consume║
+// ║   3. Slider valueRange Float vs Number：鸿蒙 Slider 的 step 不会自动  ║
+// ║      取整，UI 显示时需要 Math.round(*100)/100 防抖                     ║
+// ║   4. v1 鸿蒙 SettingsPage 多了 syncEnabled（v2 起启用），              ║
+// ║      Android 一侧 §21.5 demo 没做这一项（v5 不涉及多端协同）           ║
+// ╚══════════════════════════════════════════════════════════════════════╝
 
 import { UserPrefs } from '../data/Note'
 import { UserPrefsStore } from '../data/UserPrefsStore'
