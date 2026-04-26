@@ -3,6 +3,46 @@
 // 鸿蒙的系统分享 = systemShareComponent.shareController + ShareData。
 // 笔记导出文本 + tags 拼接，让用户可以分享到 IM / 邮件 / 备忘录等系统级支持的
 // 任意应用。
+//
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ §21.5 [feat-6] Android → HarmonyOS NEXT 迁移要点                      ║
+// ╠══════════════════════════════════════════════════════════════════════╣
+// ║ Android 原工程（v5-android-source 分支 [feat-6]）                     ║
+// ║   - util/ShareNote.kt：                                              ║
+// ║       Intent(ACTION_SEND).apply {                                     ║
+// ║         type = "text/plain"                                           ║
+// ║         putExtra(EXTRA_SUBJECT, title)                                ║
+// ║         putExtra(EXTRA_TEXT, template)                                ║
+// ║       }                                                               ║
+// ║   - Intent.createChooser(send, "分享到…")                             ║
+// ║   - 长按列表项 / 详情 ShareIcon → 弹分享 chooser                       ║
+// ║                                                                      ║
+// ║ HarmonyOS 对应实现（本文件）                                          ║
+// ║   - systemShare.ShareController({ data: utd.UDC.text, ... })         ║
+// ║   - controller.show(context, ShareController.Anchor) 弹原生面板       ║
+// ║   - utd.UniformDataType.TEXT 表示纯文本类型                          ║
+// ║                                                                      ║
+// ║ 关键映射                                                              ║
+// ║   Intent.ACTION_SEND text/plain                                       ║
+// ║       ↔  systemShare.ShareData({ utd.UniformDataType.TEXT })         ║
+// ║   Intent.EXTRA_SUBJECT / EXTRA_TEXT                                   ║
+// ║       ↔  ShareData.title / ShareData.content                          ║
+// ║   Intent.createChooser(intent, title)                                 ║
+// ║       ↔  systemShare.ShareController.show(uiCtx, anchor)             ║
+// ║   FLAG_ACTIVITY_NEW_TASK                                              ║
+// ║       ↔  无需，鸿蒙必须从 UIContext 启动（不能从 ApplicationContext） ║
+// ║   combinedClickable.onLongClick                                       ║
+// ║       ↔  .gesture(LongPressGesture().onAction(...))                  ║
+// ║                                                                      ║
+// ║ 注意点（迁移踩坑）                                                    ║
+// ║   1. Android Intent 是松耦合协议，目标 App 用 IntentFilter 自助匹配；  ║
+// ║      鸿蒙 ShareKit 通过 utd.UniformDataType 强类型 + 系统调度，         ║
+// ║      未声明 utd 类型的 App 不会出现在分享面板                         ║
+// ║   2. createChooser 每次都弹；ShareController.show 同样可控显隐，      ║
+// ║      但必须从 UIContext 调用（页面销毁后调会抛异常）                  ║
+// ║   3. 富文本 / 图片 / 文件需要切换到 utd.UniformDataType.IMAGE 等，    ║
+// ║      Android 用 EXTRA_STREAM + Uri；鸿蒙用 ShareData.uri + utd        ║
+// ╚══════════════════════════════════════════════════════════════════════╝
 
 import { common } from '@kit.AbilityKit'
 import { systemShare } from '@kit.ShareKit'
