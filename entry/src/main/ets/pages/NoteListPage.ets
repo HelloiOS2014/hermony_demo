@@ -8,6 +8,12 @@
 // ⚠️ 教学型性能债 #3（在 NoteStore 模块）：
 //   add/update/remove 都返回新数组，调用方只能 this.notes = [...]，触发整列表 build()。
 //   v3-perf-optimized 改：V2 @ObservedV2 + @Trace 字段级触发。
+//
+// v2-multidevice 增量：
+//   - 列表用 GridRow + GridCol 包裹，按断点 sm/md/lg/xl 自动切 1/2/3/4 列布局
+//     （手机竖屏 sm → 1 列，平板 md → 2 列，2in1 lg → 3 列，超大屏 xl → 4 列）
+//   - 仍走 LazyForEach + IDataSource，断点变化只影响每行 GridCol 的 span，
+//     不重建 LazyForEach 的子节点（与 §17.x 渲染性能规范兼容）
 
 import { Note } from '../data/Note'
 import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
@@ -266,20 +272,47 @@ export struct NoteListPage {
         } else if (this.notes.length === 0) {
           this.EmptyView()
         } else {
-          List({ space: 0 }) {
-            LazyForEach(this.dataSource, (note: Note) => {
-              ListItem() {
-                this.NoteCard(note)
+          // v2-multidevice 响应式断点：
+          //   sm（手机竖屏  < 600vp）→ 1 列（GridCol span 12，相当于占满 12 格）
+          //   md（平板 / 2in1 600..840vp）→ 2 列（每个 GridCol span 6）
+          //   lg（大屏 840..1440vp）→ 3 列（每个 GridCol span 4）
+          //   xl（超大屏 ≥ 1440vp）→ 4 列（每个 GridCol span 3）
+          // 注意：GridRow 自身只负责"列轨道 + 间距"，不替换 LazyForEach。
+          // LazyForEach 仍是底层渲染入口（断点切换时 GridCol span 改，子节点不重建）。
+          GridRow({
+            columns: { sm: 12, md: 12, lg: 12, xl: 12 },
+            gutter: { x: 12, y: 8 },
+            breakpoints: { value: ['600vp', '840vp', '1440vp'], reference: BreakpointsReference.WindowSize }
+          }) {
+            GridCol({ span: 12 }) {
+              List({ space: 0 }) {
+                LazyForEach(this.dataSource, (note: Note) => {
+                  ListItem() {
+                    GridRow({
+                      columns: { sm: 12, md: 12, lg: 12, xl: 12 },
+                      breakpoints: {
+                        value: ['600vp', '840vp', '1440vp'],
+                        reference: BreakpointsReference.WindowSize
+                      }
+                    }) {
+                      GridCol({ span: { sm: 12, md: 6, lg: 4, xl: 3 } }) {
+                        this.NoteCard(note)
+                      }
+                    }
+                  }
+                },
+                // ⚠️ 教学债 #1：用 index 作 key（应用 item.id）
+                (_note: Note, idx: number) => idx.toString())
               }
-            },
-            // ⚠️ 教学债 #1：用 index 作 key（应用 item.id）
-            (_note: Note, idx: number) => idx.toString())
+              .width('100%')
+              .layoutWeight(1)
+              .scrollBar(BarState.Off)
+              .cachedCount(3)
+            }
           }
           .width('100%')
           .layoutWeight(1)
           .padding({ left: 16, right: 16 })
-          .scrollBar(BarState.Off)
-          .cachedCount(3)
         }
       }
       .width('100%')
