@@ -22,6 +22,11 @@ import { common, Permissions as AbilityPermissions } from '@kit.AbilityKit'
 import { promptAction } from '@kit.ArkUI'
 import { bindAccessListener, requestPermission, GrantStatus } from '../utils/Permissions'
 import { shareNote } from '../utils/ShareNote'
+import {
+  DistributedNoteStore,
+  DISTRIBUTED_STORE_KEY,
+  DistributedSyncListener
+} from '../data/DistributedNoteStore'
 
 // IDataSource 实现：v1 版做最简实现，每次外部数据改动都整体 reload
 class NoteListSource implements IDataSource {
@@ -63,6 +68,7 @@ export struct NoteListPage {
   @State notes: Note[] = []
   @State loading: boolean = true
   @State contactsDeniedForbidden: boolean = false
+  @State remotePeerOnline: boolean = false   // v2-multidevice：对端在线状态指示
   private dataSource: NoteListSource = new NoteListSource()
 
   async aboutToAppear(): Promise<void> {
@@ -84,6 +90,28 @@ export struct NoteListPage {
         }
       }
     )
+
+    // v2-multidevice：分布式同步监听
+    // 同步开启的会话由 EntryAbility / SettingsPage 控制；本页只负责"对端来变更时刷新 UI"
+    const distStore = AppStorage.get<DistributedNoteStore>(DISTRIBUTED_STORE_KEY)
+    if (distStore !== undefined && distStore.isJoined()) {
+      const listener: DistributedSyncListener = {
+        onChange: async (_remoteNotes: Note[], _fields: string[]) => {
+          // distStore 已经把对端 notes 写回本地 NoteStore；UI 这层只重新拉一次列表
+          const s = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
+          if (s !== undefined) {
+            this.notes = await s.loadAll()
+            this.dataSource.setData(this.notes)
+          }
+        },
+        onStatus: (_networkId: string, status: 'online' | 'offline') => {
+          this.remotePeerOnline = status === 'online'
+        }
+      }
+      distStore.joinSession(distStore.getSessionId(), listener)
+      // 进列表页时把本地最新数据 mirror 一次给对端（防对端启动晚于本端）
+      distStore.mirrorLocalToRemote()
+    }
   }
 
   // ⚠️ 教学债 #2：v1 故意**不实现** aboutToDisappear 解绑监听器
@@ -120,6 +148,8 @@ export struct NoteListPage {
       this.notes = await store.add(newNote)
       this.dataSource.setData(this.notes)
       this.contactsDeniedForbidden = false
+      // v2-multidevice：本地写完同步到分布式对象，对端 onChange 会拿到新笔记
+      this.mirrorIfSyncing()
       promptAction.showToast({ message: '已导入 ' + mockContacts.length + ' 位联系人', duration: 1500 })
     } else if (status === 'denied_forbidden') {
       this.contactsDeniedForbidden = true
@@ -146,8 +176,19 @@ export struct NoteListPage {
     // 教学债 #3：整对象写
     this.notes = await store.add(newNote)
     this.dataSource.setData(this.notes)
+    // v2-multidevice：本地新建笔记 → 镜像到分布式对象
+    this.mirrorIfSyncing()
     // 直接进入详情页编辑
     this.navPathStack.pushPathByName('NoteDetailPage', newNote.id)
+  }
+
+  // v2-multidevice：把本地 NoteStore 当前快照镜像给分布式对象（仅当前在会话中时）
+  // 列表页所有"会写本地"的入口（add / importContacts）都要在落盘后调一次
+  private mirrorIfSyncing(): void {
+    const distStore = AppStorage.get<DistributedNoteStore>(DISTRIBUTED_STORE_KEY)
+    if (distStore !== undefined && distStore.isJoined()) {
+      distStore.mirrorLocalToRemote()
+    }
   }
 
   @Builder
@@ -225,6 +266,13 @@ export struct NoteListPage {
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
             .layoutWeight(1)
+          // v2-multidevice：对端在线状态指示（绿点 = online，灰点 = offline）
+          if (this.remotePeerOnline) {
+            Text('● 已连')
+              .fontSize(11)
+              .fontColor('#1ABC9C')
+              .padding({ left: 6, right: 6 })
+          }
           Text('👥')
             .fontSize(22)
             .padding(8)

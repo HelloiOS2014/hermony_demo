@@ -5,6 +5,11 @@ import { NoteRdb } from '../data/NoteRdb'
 import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
 import { UserPrefsStore } from '../data/UserPrefsStore'
 import { seedNotes, UserPrefs, Note } from '../data/Note'
+import {
+  DistributedNoteStore,
+  DISTRIBUTED_STORE_KEY,
+  DistributedSyncListener
+} from '../data/DistributedNoteStore'
 
 const TAG = 'EntryAbility'
 const DOMAIN = 0xFF00
@@ -58,6 +63,23 @@ export default class EntryAbility extends UIAbility {
     const prefs = await prefsStore.load()
     AppStorage.setOrCreate('themeMode', prefs.themeMode)
     this.applyColorMode(prefs.themeMode)
+
+    // 3.1 v2-multidevice：分布式笔记同步 store —— 模块级初始化（不立即 joinSession）
+    // joinSession 由用户在 SettingsPage 切 syncEnabled 时触发
+    const distStore = new DistributedNoteStore(store)
+    distStore.init(this.context)
+    AppStorage.setOrCreate(DISTRIBUTED_STORE_KEY, distStore)
+    if (prefs.syncEnabled) {
+      // 用户已开过同步开关 —— 重启后自动 rejoin
+      // sessionId 简化为常量 'hermony_notes_session'（demo 用，无账号体系）
+      // 真实业务请拼用户 ID：`<userId>_notes`
+      const noopListener: DistributedSyncListener = {
+        onChange: (_n, _f) => {},
+        onStatus: (_id, _s) => {}
+      }
+      distStore.joinSession('hermony_notes_session', noopListener)
+      hilog.info(DOMAIN, TAG, 'auto-rejoin distributed session')
+    }
 
     // 4. v2-multidevice：被自由流转拉起时，want.parameters 内含源端 onContinue 打包的状态
     //    LaunchReason.CONTINUATION = 4（系统枚举），目标端用 launchParam 判定
@@ -235,6 +257,11 @@ export default class EntryAbility extends UIAbility {
 
   onDestroy(): void {
     hilog.info(DOMAIN, TAG, 'onDestroy')
+    // v2-multidevice：必须显式 leaveSession，避免 listener 闭包持有 ability 上下文
+    const distStore = AppStorage.get<DistributedNoteStore>(DISTRIBUTED_STORE_KEY)
+    if (distStore !== undefined) {
+      distStore.leaveSession()
+    }
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {

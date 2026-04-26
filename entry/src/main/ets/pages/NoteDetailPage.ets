@@ -17,6 +17,7 @@ import { promptAction } from '@kit.ArkUI'
 import { common } from '@kit.AbilityKit'
 import { shareNote } from '../utils/ShareNote'
 import EntryAbility, { ContinuedDraft, CONTINUED_DRAFT_KEY } from '../entryability/EntryAbility'
+import { DistributedNoteStore, DISTRIBUTED_STORE_KEY } from '../data/DistributedNoteStore'
 
 @Component
 export struct NoteDetailPage {
@@ -122,6 +123,13 @@ export struct NoteDetailPage {
     }
     this.dirty = false
     this.continuedFromRemote = false
+
+    // v2-multidevice：保存后镜像到分布式对象（仅当前在会话中）
+    const distStore = AppStorage.get<DistributedNoteStore>(DISTRIBUTED_STORE_KEY)
+    if (distStore !== undefined && distStore.isJoined()) {
+      distStore.mirrorLocalToRemote()
+    }
+
     promptAction.showToast({ message: '已保存', duration: 1200 })
   }
 
@@ -159,6 +167,13 @@ export struct NoteDetailPage {
       return
     }
     await store.remove(this.noteId)
+    // v2-multidevice：删除后镜像到分布式对象，对端 onChange 触发"远端没有的笔记"判定
+    // （注意：DistributedNoteStore.applyRemoteToLocal 不主动删本地——避免离线端清空对端，
+    //  真实业务请走墓碑表，详见 DistributedNoteStore.ets 注释）
+    const distStore = AppStorage.get<DistributedNoteStore>(DISTRIBUTED_STORE_KEY)
+    if (distStore !== undefined && distStore.isJoined()) {
+      distStore.mirrorLocalToRemote()
+    }
     promptAction.showToast({ message: '已删除', duration: 1200 })
     this.navPathStack.pop()
   }
