@@ -1,10 +1,10 @@
-import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit'
+import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit'
 import { window } from '@kit.ArkUI'
 import { hilog } from '@kit.PerformanceAnalysisKit'
 import { NoteRdb } from '../data/NoteRdb'
 import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
 import { UserPrefsStore } from '../data/UserPrefsStore'
-import { seedNotes } from '../data/Note'
+import { seedNotes, UserPrefs } from '../data/Note'
 
 const TAG = 'EntryAbility'
 const DOMAIN = 0xFF00
@@ -36,6 +36,29 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate('userPrefsStore', prefsStore)
     const prefs = await prefsStore.load()
     AppStorage.setOrCreate('themeMode', prefs.themeMode)
+    this.applyColorMode(prefs.themeMode)
+  }
+
+  applyColorMode(mode: 'light' | 'dark' | 'system'): void {
+    let target: ConfigurationConstant.ColorMode = ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET
+    if (mode === 'light') {
+      target = ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT
+    } else if (mode === 'dark') {
+      target = ConfigurationConstant.ColorMode.COLOR_MODE_DARK
+    }
+    this.context.getApplicationContext().setColorMode(target)
+    hilog.info(DOMAIN, TAG, 'applyColorMode mode=%{public}s', mode)
+  }
+
+  async saveAndApplyTheme(mode: 'light' | 'dark' | 'system'): Promise<void> {
+    const prefsStore = AppStorage.get<UserPrefsStore>('userPrefsStore')
+    if (prefsStore !== undefined) {
+      const cur: UserPrefs = await prefsStore.load()
+      cur.themeMode = mode
+      await prefsStore.save(cur)
+    }
+    AppStorage.setOrCreate('themeMode', mode)
+    this.applyColorMode(mode)
   }
 
   onDestroy(): void {
