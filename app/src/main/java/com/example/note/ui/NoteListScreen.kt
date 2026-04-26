@@ -1,15 +1,13 @@
 // ui/NoteListScreen.kt
 // 笔记列表屏。
 //
-// feat-1 阶段：
-//   - 使用 ViewModel 维护内存中的 List<Note>
-//   - LazyColumn 渲染 + 5 条预置笔记 + 空态
-// 后续：
-//   - feat-2 增加点击跳转详情
-//   - feat-3 把 ViewModel 数据源换成 Room Flow
+// feat-1：内存列表 + LazyColumn + 5 条预置
+// feat-2：Row 接 onClick 跳详情，FAB 新建后跳转详情编辑
+// 后续：feat-3 把 ViewModel 数据源换成 Room Flow
 
 package com.example.note.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -39,17 +37,27 @@ class NoteListViewModel : ViewModel() {
     private val _notes = MutableStateFlow(seedNotes())
     val notes: StateFlow<List<Note>> = _notes.asStateFlow()
 
-    fun addBlank() {
+    /** 创建一条空白笔记并返回它的 id（feat-2 用 id 跳详情）。 */
+    fun addBlank(): Long {
         val now = System.currentTimeMillis()
         val next = (_notes.value.maxOfOrNull { it.id } ?: 0L) + 1
-        _notes.value = listOf(
-            Note(
-                id = next,
-                title = "新笔记 #$next",
-                content = "",
-                updatedAt = now,
-            )
-        ) + _notes.value
+        val n = Note(
+            id = next,
+            title = "新笔记 #$next",
+            content = "",
+            updatedAt = now,
+        )
+        _notes.value = listOf(n) + _notes.value
+        return next
+    }
+
+    fun get(id: Long): Note? = _notes.value.firstOrNull { it.id == id }
+
+    fun update(id: Long, title: String, content: String) {
+        _notes.value = _notes.value.map {
+            if (it.id == id) it.copy(title = title, content = content, updatedAt = System.currentTimeMillis())
+            else it
+        }
     }
 
     private fun seedNotes(): List<Note> {
@@ -68,6 +76,7 @@ class NoteListViewModel : ViewModel() {
 @Composable
 fun NoteListScreen(
     viewModel: NoteListViewModel = viewModel(),
+    onOpenDetail: (Long) -> Unit = {},
 ) {
     val notes by viewModel.notes.collectAsState()
 
@@ -78,7 +87,10 @@ fun NoteListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.addBlank() }) {
+            FloatingActionButton(onClick = {
+                val id = viewModel.addBlank()
+                onOpenDetail(id) // feat-2：新建后直接跳详情编辑
+            }) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_new))
             }
         },
@@ -99,7 +111,7 @@ fun NoteListScreen(
                 contentPadding = PaddingValues(vertical = 8.dp),
             ) {
                 items(items = notes, key = { it.id }) { note ->
-                    NoteRow(note)
+                    NoteRow(note, onClick = { onOpenDetail(note.id) })
                     HorizontalDivider()
                 }
             }
@@ -108,11 +120,12 @@ fun NoteListScreen(
 }
 
 @Composable
-private fun NoteRow(note: Note) {
+private fun NoteRow(note: Note, onClick: () -> Unit) {
     val fmt = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(

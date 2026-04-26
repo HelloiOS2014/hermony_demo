@@ -1,3 +1,4 @@
 # §21.5 v5-android-source 7 个 [feat-N] commit hash 索引
 # 自动追加（每个 commit 完成后由 subagent 写入）
 
+[feat-1] d5d67097e8c63728d255d7693621fbbc97e5d1e2
