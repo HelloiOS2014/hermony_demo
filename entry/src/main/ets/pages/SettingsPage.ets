@@ -1,26 +1,195 @@
-// SettingsPage — 占位（[feat-7] 增量补充 UserPrefs 表单）
+// SettingsPage — 设置页
+//
+// 三项设置：
+//   1. themeMode  light / dark / system  → 立即应用 + UserPrefs.flush()
+//   2. defaultTags 逗号分隔输入框，新建笔记时会预填
+//   3. syncEnabled v1 默认关闭 + 灰显（v2-multidevice 起接 distributedDataObject）
+
+import { UserPrefs } from '../data/Note'
+import { UserPrefsStore } from '../data/UserPrefsStore'
+import { ConfigurationConstant, common } from '@kit.AbilityKit'
+import { promptAction } from '@kit.ArkUI'
 
 @Component
 export struct SettingsPage {
   @Consume('navPathStack') navPathStack: NavPathStack
+  @State themeMode: 'light' | 'dark' | 'system' = 'system'
+  @State defaultTagsText: string = ''
+  @State syncEnabled: boolean = false
+  @State loading: boolean = true
+
+  async aboutToAppear(): Promise<void> {
+    const store = AppStorage.get<UserPrefsStore>('userPrefsStore')
+    if (store !== undefined) {
+      const prefs = await store.load()
+      this.themeMode = prefs.themeMode
+      this.defaultTagsText = prefs.defaultTags.join(',')
+      this.syncEnabled = prefs.syncEnabled
+    }
+    this.loading = false
+  }
+
+  private async persist(): Promise<void> {
+    const store = AppStorage.get<UserPrefsStore>('userPrefsStore')
+    if (store === undefined) {
+      return
+    }
+    const tags = this.defaultTagsText
+      .split(/[,，]/)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0)
+    const next: UserPrefs = {
+      themeMode: this.themeMode,
+      defaultTags: tags,
+      syncEnabled: this.syncEnabled
+    }
+    await store.save(next)
+    AppStorage.setOrCreate('themeMode', this.themeMode)
+  }
+
+  private applyColorMode(mode: 'light' | 'dark' | 'system'): void {
+    let target: ConfigurationConstant.ColorMode = ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET
+    if (mode === 'light') {
+      target = ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT
+    } else if (mode === 'dark') {
+      target = ConfigurationConstant.ColorMode.COLOR_MODE_DARK
+    }
+    const ctx = getContext(this) as common.UIAbilityContext
+    ctx.getApplicationContext().setColorMode(target)
+  }
+
+  @Builder
+  ThemeRow(label: string, value: 'light' | 'dark' | 'system') {
+    Row() {
+      Text(label)
+        .fontSize(15)
+        .fontColor($r('app.color.primary_text'))
+        .layoutWeight(1)
+      if (this.themeMode === value) {
+        Text('✓')
+          .fontSize(18)
+          .fontColor($r('app.color.accent'))
+      }
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+    .onClick(async () => {
+      this.themeMode = value
+      this.applyColorMode(value)
+      await this.persist()
+      promptAction.showToast({ message: '主题已切换', duration: 1000 })
+    })
+  }
 
   build() {
     NavDestination() {
       Column() {
-        Text($r('app.string.title_settings'))
-          .fontSize(20)
-          .fontWeight(FontWeight.Medium)
-          .margin({ top: 24 })
-        Text('（[feat-7] 提交后填充 UserPrefs 表单）')
-          .fontSize(14)
-          .fontColor($r('app.color.secondary_text'))
-          .margin({ top: 12 })
+        // Top bar
+        Row() {
+          Text('‹ 返回')
+            .fontSize(16)
+            .fontColor($r('app.color.accent'))
+            .padding(8)
+            .onClick(() => this.navPathStack.pop())
+          Blank()
+          Text($r('app.string.title_settings'))
+            .fontSize(18)
+            .fontWeight(FontWeight.Medium)
+          Blank()
+          // 占位保持视觉对称
+          Text('   ').padding(8)
+        }
+        .width('100%')
+        .padding({ top: 4, bottom: 4 })
+
+        if (this.loading) {
+          LoadingProgress()
+            .width(40)
+            .height(40)
+            .margin({ top: 80 })
+        } else {
+          Scroll() {
+            Column({ space: 16 }) {
+              // 主题
+              Column() {
+                Text($r('app.string.settings_theme'))
+                  .fontSize(13)
+                  .fontColor($r('app.color.secondary_text'))
+                  .width('100%')
+                  .padding({ left: 16, top: 12, bottom: 8 })
+                Column() {
+                  this.ThemeRow('跟随系统', 'system')
+                  Divider().strokeWidth(0.3).color($r('app.color.secondary_text')).opacity(0.3)
+                    .margin({ left: 16, right: 16 })
+                  this.ThemeRow('浅色', 'light')
+                  Divider().strokeWidth(0.3).color($r('app.color.secondary_text')).opacity(0.3)
+                    .margin({ left: 16, right: 16 })
+                  this.ThemeRow('深色', 'dark')
+                }
+                .width('100%')
+                .backgroundColor($r('app.color.card_background'))
+                .borderRadius(12)
+              }
+
+              // 默认标签
+              Column() {
+                Text($r('app.string.settings_default_tags'))
+                  .fontSize(13)
+                  .fontColor($r('app.color.secondary_text'))
+                  .width('100%')
+                  .padding({ left: 16, top: 4, bottom: 8 })
+                TextInput({ placeholder: '逗号分隔，例：工作,日记', text: this.defaultTagsText })
+                  .fontSize(15)
+                  .backgroundColor($r('app.color.card_background'))
+                  .borderRadius(12)
+                  .padding(16)
+                  .onChange((v) => {
+                    this.defaultTagsText = v
+                  })
+                  .onBlur(() => {
+                    this.persist()
+                  })
+              }
+
+              // 同步开关（v1 灰显）
+              Column() {
+                Text($r('app.string.settings_sync'))
+                  .fontSize(13)
+                  .fontColor($r('app.color.secondary_text'))
+                  .width('100%')
+                  .padding({ left: 16, top: 4, bottom: 8 })
+                Row() {
+                  Text('多端同步（v2 起支持）')
+                    .fontSize(15)
+                    .fontColor($r('app.color.primary_text'))
+                    .layoutWeight(1)
+                    .opacity(0.5)
+                  Toggle({ type: ToggleType.Switch, isOn: this.syncEnabled })
+                    .enabled(false)   // v1 始终灰显；v2-multidevice 启用
+                    .onChange((on) => {
+                      this.syncEnabled = on
+                      this.persist()
+                    })
+                }
+                .width('100%')
+                .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+                .backgroundColor($r('app.color.card_background'))
+                .borderRadius(12)
+              }
+            }
+            .padding({ left: 16, right: 16, top: 8, bottom: 24 })
+            .width('100%')
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .scrollBar(BarState.Off)
+        }
       }
       .width('100%')
       .height('100%')
-      .padding(16)
       .backgroundColor($r('app.color.page_background'))
     }
     .title($r('app.string.title_settings'))
+    .hideTitleBar(true)
   }
 }
