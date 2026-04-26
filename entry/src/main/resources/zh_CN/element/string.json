@@ -1,0 +1,21 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "Hermony 笔记主模块" },
+    { "name": "entry_desc", "value": "Hermony 笔记入口" },
+    { "name": "app_name", "value": "Hermony 笔记" },
+    { "name": "perm_contacts_reason", "value": "导入通讯录联系人到笔记标签" },
+    { "name": "perm_camera_reason", "value": "拍摄附图加入笔记" },
+    { "name": "title_note_list", "value": "我的笔记" },
+    { "name": "title_note_detail", "value": "笔记详情" },
+    { "name": "title_settings", "value": "设置" },
+    { "name": "action_new_note", "value": "新建笔记" },
+    { "name": "action_save", "value": "保存" },
+    { "name": "action_delete", "value": "删除" },
+    { "name": "action_share", "value": "分享" },
+    { "name": "empty_note_hint", "value": "还没有笔记，点击右下角新建一条吧" },
+    { "name": "perm_denied_hint", "value": "权限被拒绝，请在系统设置中授予后重试" },
+    { "name": "settings_theme", "value": "主题" },
+    { "name": "settings_default_tags", "value": "默认标签" },
+    { "name": "settings_sync", "value": "云同步（v2 起支持）" }
+  ]
+}

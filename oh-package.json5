@@ -1,0 +1,13 @@
+{
+  "name": "hermony-note-v1",
+  "version": "1.0.0",
+  "description": "Hermony NEXT M7 §21.1 单端笔记 App（含 3 处教学型性能债，对照 §21.3 修复）",
+  "main": "",
+  "author": "Hermony Tutorial",
+  "license": "Apache-2.0",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hvigor-ohos-plugin": "5.0.5",
+    "@ohos/hypium": "1.0.21"
+  }
+}
