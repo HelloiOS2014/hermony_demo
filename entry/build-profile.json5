@@ -6,7 +6,13 @@
         "sources": [],
         "packages": []
       }
-    }
+    },
+    // [v4-1] testCompileMode = mixed
+    //   debug 包测试制品 mock 字节码改写依赖 mixed 模式；改成 full / AOT 会让 MockKit static mock
+    //   抛 "static mock not supported"（见 hermony §16.5 反例 1）。
+    //   注：当前 hvigor 5.0.5 在 buildOption.compileMode 字段读，此处保留 mixed 作显式约束。
+    "compileMode": "esmodule",
+    "testCompileMode": "mixed"
   },
   "buildOptionSet": [
     {
@@ -21,6 +27,26 @@
     }
   ],
   "targets": [
-    { "name": "default" }
+    { "name": "default" },
+    {
+      // [v4-1] ohosTest target 单独配置 jacoco 覆盖率门槛（业务核心 ≥ 80% / 工具 ≥ 50%）
+      // 实际 hvigor jacoco 配置在 hvigorfile.ts 里读这里的 testOptions
+      "name": "ohosTest",
+      "applyToProducts": ["default"],
+      "testOptions": {
+        "coverage": {
+          "enabled": true,
+          "outputFormats": ["html", "xml"],
+          "thresholds": [
+            { "scope": "main/ets/data/**", "lineCoverage": 80, "branchCoverage": 70 },
+            { "scope": "main/ets/utils/**", "lineCoverage": 50, "branchCoverage": 40 }
+          ],
+          "exclude": [
+            "main/ets/pages/**/Builder*.ets",
+            "main/ets/data/Note.ets"
+          ]
+        }
+      }
+    }
   ]
 }
