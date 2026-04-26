@@ -26,6 +26,7 @@ import com.example.note.data.UserPrefsRepo
 import com.example.note.ui.NoteDetailScreen
 import com.example.note.ui.NoteListScreen
 import com.example.note.ui.NoteListViewModel
+import com.example.note.ui.SettingsScreen
 import com.example.note.ui.theme.HermonyNoteTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onOpenDetail = { id -> nav.navigate("detail/$id") },
+                            onOpenSettings = { nav.navigate("settings") },
                         )
                     }
                     composable(
@@ -77,6 +79,9 @@ class MainActivity : ComponentActivity() {
                             viewModel = vm,
                             onBack = { nav.popBackStack() },
                         )
+                    }
+                    composable("settings") {
+                        SettingsScreen(onBack = { nav.popBackStack() })
                     }
                 }
             }

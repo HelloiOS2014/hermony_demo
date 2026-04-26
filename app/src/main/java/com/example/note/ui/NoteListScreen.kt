@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,9 +33,11 @@ import com.example.note.R
 import com.example.note.data.Note
 import com.example.note.data.NoteDao
 import com.example.note.data.NoteDatabase
+import com.example.note.data.UserPrefsRepo
 import com.example.note.util.ShareNote
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -46,11 +49,15 @@ import java.util.Locale
  * - notes 来自 NoteDao.observeAll()，UI 用 collectAsState 订阅
  * - addBlank / update 都是 suspend，写库后 Flow 会自动推新值
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class NoteListViewModel(app: Application) : AndroidViewModel(app) {
 
     private val dao: NoteDao = NoteDatabase.get(app).noteDao()
+    private val prefs = UserPrefsRepo(app)
 
-    val notes: StateFlow<List<Note>> = dao.observeAll()
+    /** feat-7：根据 sortDesc 偏好动态切换 DESC/ASC 数据流。 */
+    val notes: StateFlow<List<Note>> = prefs.sortDesc
+        .flatMapLatest { desc -> if (desc) dao.observeAll() else dao.observeAllAsc() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 创建一条空白笔记并将新生成的 rowId 通过回调返回（用于跳转详情）。 */
@@ -82,6 +89,7 @@ fun NoteListScreen(
     darkOverride: Boolean? = null,
     onToggleDark: () -> Unit = {},
     onOpenDetail: (Long) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val notes by viewModel.notes.collectAsState()
 
@@ -96,6 +104,13 @@ fun NoteListScreen(
                         Icon(
                             imageVector = if (isDarkActive) Icons.Filled.LightMode else Icons.Filled.DarkMode,
                             contentDescription = stringResource(R.string.action_toggle_dark),
+                        )
+                    }
+                    // feat-7：进入设置页
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.action_open_settings),
                         )
                     }
                 },

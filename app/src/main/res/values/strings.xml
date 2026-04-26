@@ -26,4 +26,13 @@
     <string name="action_share">分享笔记</string>
     <string name="share_chooser_title">分享到…</string>
     <string name="share_template">【%1$s】\n%2$s\n\n— 来自 和音笔记</string>
+
+    <!-- feat-7 设置页 -->
+    <string name="action_open_settings">打开设置</string>
+    <string name="settings_font_scale">字号缩放</string>
+    <string name="settings_font_scale_summary">列表与详情字号倍率（0.85 ~ 1.30）</string>
+    <string name="settings_sort_desc">按更新时间倒序</string>
+    <string name="settings_sort_desc_summary">关闭后按正序展示</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_about_summary">和音笔记 · §21.5 教学项目 · v1.0</string>
 </resources>

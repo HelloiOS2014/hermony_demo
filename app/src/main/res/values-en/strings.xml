@@ -20,4 +20,12 @@
     <string name="action_share">Share note</string>
     <string name="share_chooser_title">Share via…</string>
     <string name="share_template">【%1$s】\n%2$s\n\n— from Hermony Note</string>
+
+    <string name="action_open_settings">Open settings</string>
+    <string name="settings_font_scale">Font scale</string>
+    <string name="settings_font_scale_summary">List &amp; detail font multiplier (0.85 ~ 1.30)</string>
+    <string name="settings_sort_desc">Sort by updated time DESC</string>
+    <string name="settings_sort_desc_summary">Off = ascending</string>
+    <string name="settings_about">About</string>
+    <string name="settings_about_summary">Hermony Note · §21.5 demo · v1.0</string>
 </resources>
