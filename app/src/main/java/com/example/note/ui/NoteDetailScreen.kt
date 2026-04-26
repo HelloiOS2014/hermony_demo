@@ -1,13 +1,8 @@
 // ui/NoteDetailScreen.kt
 // 笔记详情 / 编辑屏。
 //
-// feat-2 阶段：
-//   - 通过 NavHost 路由 detail/{id} 渲染
-//   - 加载 ViewModel 中的笔记，显示标题 / 正文输入框
-//   - 顶部「保存」回写到 ViewModel
-// 后续：
-//   - feat-4：在右上角加 CAMERA 权限触发 + 拒绝兜底 UI
-//   - feat-6：再加 Share 按钮（Intent.ACTION_SEND）
+// feat-2：NavHost 路由 + 标题正文输入框 + 保存
+// feat-3：通过 suspend get 从 Room 读取，LaunchedEffect 加载
 
 package com.example.note.ui
 
@@ -23,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.note.data.Note
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,21 +27,35 @@ fun NoteDetailScreen(
     viewModel: NoteListViewModel,
     onBack: () -> Unit,
 ) {
-    val origin = remember(noteId) { viewModel.get(noteId) }
+    var origin by remember(noteId) { mutableStateOf<Note?>(null) }
+    var loaded by remember(noteId) { mutableStateOf(false) }
 
-    if (origin == null) {
-        // 防御：传入未知 id 时给个友好兜底（不至于 NPE 闪退）
+    LaunchedEffect(noteId) {
+        origin = viewModel.get(noteId)
+        loaded = true
+    }
+
+    if (!loaded) {
         Scaffold { padding ->
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) { Text("笔记不存在（id=$noteId）") }
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
         }
         return
     }
 
-    var title by rememberSaveable(noteId) { mutableStateOf(origin.title) }
-    var content by rememberSaveable(noteId) { mutableStateOf(origin.content) }
+    val data = origin
+    if (data == null) {
+        Scaffold { padding ->
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("笔记不存在（id=$noteId）")
+            }
+        }
+        return
+    }
+
+    var title by rememberSaveable(noteId) { mutableStateOf(data.title) }
+    var content by rememberSaveable(noteId) { mutableStateOf(data.content) }
 
     Scaffold(
         topBar = {

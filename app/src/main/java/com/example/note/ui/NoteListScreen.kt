@@ -2,11 +2,12 @@
 // 笔记列表屏。
 //
 // feat-1：内存列表 + LazyColumn + 5 条预置
-// feat-2：Row 接 onClick 跳详情，FAB 新建后跳转详情编辑
-// 后续：feat-3 把 ViewModel 数据源换成 Room Flow
+// feat-2：点击 Row 跳详情，FAB 新建后跳详情
+// feat-3：ViewModel 数据源换成 Room Flow，重启保留数据
 
 package com.example.note.ui
 
+import android.app.Application
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,55 +21,52 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.note.R
 import com.example.note.data.Note
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.note.data.NoteDao
+import com.example.note.data.NoteDatabase
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** feat-1：内存版 ViewModel。feat-3 会被替换为依赖 NoteDao 的版本。 */
-class NoteListViewModel : ViewModel() {
+/**
+ * feat-3：Room 版 ViewModel。
+ * - notes 来自 NoteDao.observeAll()，UI 用 collectAsState 订阅
+ * - addBlank / update 都是 suspend，写库后 Flow 会自动推新值
+ */
+class NoteListViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val _notes = MutableStateFlow(seedNotes())
-    val notes: StateFlow<List<Note>> = _notes.asStateFlow()
+    private val dao: NoteDao = NoteDatabase.get(app).noteDao()
 
-    /** 创建一条空白笔记并返回它的 id（feat-2 用 id 跳详情）。 */
-    fun addBlank(): Long {
-        val now = System.currentTimeMillis()
-        val next = (_notes.value.maxOfOrNull { it.id } ?: 0L) + 1
-        val n = Note(
-            id = next,
-            title = "新笔记 #$next",
-            content = "",
-            updatedAt = now,
-        )
-        _notes.value = listOf(n) + _notes.value
-        return next
-    }
+    val notes: StateFlow<List<Note>> = dao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun get(id: Long): Note? = _notes.value.firstOrNull { it.id == id }
-
-    fun update(id: Long, title: String, content: String) {
-        _notes.value = _notes.value.map {
-            if (it.id == id) it.copy(title = title, content = content, updatedAt = System.currentTimeMillis())
-            else it
+    /** 创建一条空白笔记并将新生成的 rowId 通过回调返回（用于跳转详情）。 */
+    fun addBlank(onCreated: (Long) -> Unit) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val nextSerial = (dao.count() + 1)
+            val id = dao.insert(
+                Note(id = 0, title = "新笔记 #$nextSerial", content = "", updatedAt = now)
+            )
+            onCreated(id)
         }
     }
 
-    private fun seedNotes(): List<Note> {
-        val base = System.currentTimeMillis()
-        return listOf(
-            Note(1, "和音笔记 · 欢迎",      "这是 §21.5 教学项目首屏第 1 条预置笔记。", base - 60_000),
-            Note(2, "Compose 列表渲染要点", "LazyColumn + items(key = ) 比 Column 滚动性能更好。", base - 120_000),
-            Note(3, "Room 数据流",          "DAO 返回 Flow<List<Entity>>，UI 用 collectAsState。", base - 180_000),
-            Note(4, "运行时权限",           "API 23+ 需要在使用前 requestPermissions。", base - 240_000),
-            Note(5, "深色主题",             "values-night/ 限定符 + setDefaultNightMode。", base - 300_000),
-        )
+    suspend fun get(id: Long): Note? = dao.findById(id)
+
+    fun update(id: Long, title: String, content: String) {
+        viewModelScope.launch {
+            val cur = dao.findById(id) ?: return@launch
+            dao.update(cur.copy(title = title, content = content, updatedAt = System.currentTimeMillis()))
+        }
     }
 }
 
@@ -88,8 +86,7 @@ fun NoteListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                val id = viewModel.addBlank()
-                onOpenDetail(id) // feat-2：新建后直接跳详情编辑
+                viewModel.addBlank { id -> onOpenDetail(id) }
             }) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_new))
             }
