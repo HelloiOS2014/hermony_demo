@@ -132,16 +132,18 @@ export default function userPrefsStoreTest() {
       }
     })
 
-    it('require_before_init_should_throw', 0, () => {
-      // 未 init 直接 load 应抛错（防御 require() 守卫）
+    it('require_before_init_should_throw', 0, async (done: Function) => {
+      // 未 init 直接 load 应抛错（防御 require() 守卫，无需先调 init）
       const fresh = new UserPrefsStore()
-      let threw = false
-      fresh.load().catch(() => {
-        threw = true
-      })
-      // 同步路径 require() 在 await 之前抛 —— 走 promise reject 后这里其实无需 await
-      // 但为了避免异步竞态，给 expect 一个最简检查（require 守卫存在即可）
-      expect(threw === true || threw === false).assertTrue()
+      try {
+        await fresh.load()
+        // 不应到这里：load() 在未 init 时必须 reject
+        done(new Error('expected load() to reject before init, but it resolved') as Error)
+      } catch (e) {
+        // 期望路径：require 守卫触发 reject
+        expect(e !== null && e !== undefined).assertTrue()
+        done()
+      }
     })
   })
 }

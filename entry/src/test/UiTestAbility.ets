@@ -26,8 +26,9 @@ export default class UiTestAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     hilog.info(DOMAIN, TAG, '%{public}s', 'onWindowStageCreate')
     // 测试 Ability 不挂业务页面 —— testRunner 走 startAbility(EntryAbility) 来跑被测业务
-    // 这里给一个空白载入页避免 windowStage 报错
-    windowStage.loadContent('testability/pages/Index', (err) => {
+    // 这里复用业务侧 MainPage 作为占位（避免引入未实现的 testability/pages/Index）；
+    // testRunner.onRun 内会走 startAbility(EntryAbility) 切到真业务，windowStage 不会真渲染 MainPage。
+    windowStage.loadContent('pages/MainPage', (err) => {
       if (err.code !== 0) {
         hilog.error(DOMAIN, TAG, 'loadContent failed code=%{public}d', err.code)
       }

@@ -148,11 +148,13 @@ export default function uiTestList() {
         // 长按 600ms（业务设的 LongPress duration = 500ms，留 100ms buffer）
         await card.longClick()
         await driver.delayMs(800)
-        // 不强制断言系统 sheet（分享 sheet 是系统级，不同 OS 版本表现不同）
-        // 只要列表页 / 系统 sheet 之一存在即视为未 crash
-        const stillAlive = await driver.findComponent(ON.text('+', MatchPattern.EQUALS))
-        // 分享 sheet 可能盖住 FAB，所以 stillAlive 为 null 也是合理路径
-        expect(stillAlive !== null || stillAlive === null).assertTrue()
+        // 系统分享 sheet 不同 OS 版本表现不同，但 longClick 后业务进程必须未 crash。
+        // 用"按返回键能切回业务"作为有效断言：sheet 关闭后或本来就没 sheet 时，
+        // 列表页 FAB（'+' 按钮）必然可见 —— 这能证明业务进程未挂。
+        await driver.pressBack()
+        await driver.delayMs(300)
+        const fab = await driver.findComponent(ON.text('+', MatchPattern.EQUALS))
+        expect(fab !== null).assertTrue()
         // 把可能弹出的 sheet 关掉
         await driver.pressBack()
         await driver.delayMs(300)

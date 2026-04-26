@@ -32,7 +32,7 @@
     //   srcPath 指向 ohosTest 测试根（hvigor 默认按 src/test 找；此处保留显式声明便于日后切目录）
     "testRunner": {
       "name": "OhosTestRunner",
-      "srcPath": "ohosTest"
+      "srcPath": "test"
     },
     "requestPermissions": [
       {

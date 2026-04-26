@@ -83,8 +83,8 @@ stages:
       - hvigorw assembleHap --mode release --no-daemon
     artifacts:
       paths:
-        - entry/build/default/outputs/default/entry-default-signed.hap
-        - entry/build/default/outputs/default/entry-default-unsigned.hap
+        - entry/build/default/outputs/default/entry-release-signed.hap
+        - entry/build/default/outputs/default/entry-release-unsigned.hap
       expire_in: 7 days
 
   # ─────────────────────────────────────────────

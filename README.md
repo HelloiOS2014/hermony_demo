@@ -32,7 +32,7 @@ Hermony NEXT 教程站 §21.4 实战 IV 对应代码。本工程是 5 实战累�
 - **[v4-4] 制品 hash + AGC Hosting 链接**（`docs/`，mock 数据）
   - `docs/artifact-hash.txt`：mock sha256 + 构建 / 签名命令（M8 真机批次替换为真实 hash）
   - `docs/agc-hosting-link.txt`：mock AGC 链接 + 灰度计划（5% → 5% → 20% → 50% → 100%）
-    + 回滚预案（rollback_target = v3.0.0）
+    + 回滚预案（rollback_target = v3.0.0-optimized）
 - **[v4-5] README 更新**（本文件）
 
 ## CI 凭证依赖
@@ -60,7 +60,8 @@ CI 凭证准备清单详见 hermony 主仓 `docs/superpowers/practice/m7-ci-cred
 
 - `v1.0.0`：单端笔记基线（v1-single 分支），含 3 处教学型性能债，对应 §21.1
 - `v2.0.0`：多端协同版（v2-multidevice 分支），加响应式 / 流转 / 分布式同步，对应 §21.2
-- `v3.0.0`：性能优化版（v3-perf-optimized 分支），修教学债 #1/#2/#3，对应 §21.3
+- `v3.0.0-baseline`：性能基线版（v3-perf-baseline 分支），与 v1 等价 + hiTraceMeter 打点占位，对应 §21.3 baseline；
+  `v3.0.0-optimized`：性能优化版（v3-perf-optimized 分支），修教学债 #1/#2/#3，对应 §21.3 optimized
 - `v4.0.0`：**测试 + CI 版本**（**本分支**），加 Hypium 测试 + UI 自动化 + .agc-pipeline.yaml，
   对应 **§21.4 教程章节**。controller 在 5 个 `[v4-X]` commit + push 之后打 tag。
 - `v5.0.0`：跨平台版（v5-arkts-final 分支），对应 §21.5
