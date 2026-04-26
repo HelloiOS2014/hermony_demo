@@ -12,6 +12,9 @@
 import { Note } from '../data/Note'
 import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
 import { genNoteId } from '../data/Note'
+import { common, Permissions as AbilityPermissions } from '@kit.AbilityKit'
+import { promptAction } from '@kit.ArkUI'
+import { bindAccessListener, requestPermission, GrantStatus } from '../utils/Permissions'
 
 // IDataSource 实现：v1 版做最简实现，每次外部数据改动都整体 reload
 class NoteListSource implements IDataSource {
@@ -52,6 +55,7 @@ export struct NoteListPage {
   // 教学债 #3 触发点：整对象赋值
   @State notes: Note[] = []
   @State loading: boolean = true
+  @State contactsDeniedForbidden: boolean = false
   private dataSource: NoteListSource = new NoteListSource()
 
   async aboutToAppear(): Promise<void> {
@@ -61,13 +65,61 @@ export struct NoteListPage {
       this.dataSource.setData(this.notes)
     }
     this.loading = false
+
+    // 教学债 #2 触发点：在 aboutToAppear 注册 abilityAccessCtrl 监听器
+    // 但 aboutToDisappear **不**调用对称的 unbind，反复进出列表会累积监听器引用。
+    // §21.3 修复后会在 aboutToDisappear 加 unbindAccessListener。
+    bindAccessListener(
+      ['ohos.permission.READ_CONTACTS', 'ohos.permission.CAMERA'],
+      (perm, granted) => {
+        if (granted && perm === 'ohos.permission.READ_CONTACTS') {
+          this.contactsDeniedForbidden = false
+        }
+      }
+    )
   }
+
+  // ⚠️ 教学债 #2：v1 故意**不实现** aboutToDisappear 解绑监听器
+  // aboutToDisappear(): void { unbindAccessListener(...) }   ← v3 修复后启用
 
   private formatTime(ts: number): string {
     const d = new Date(ts)
     const pad = (n: number): string => n < 10 ? '0' + n : '' + n
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
         + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+  }
+
+  private async importContacts(): Promise<void> {
+    const ctx = getContext(this) as common.UIAbilityContext
+    const perm: AbilityPermissions = 'ohos.permission.READ_CONTACTS'
+    const status: GrantStatus = await requestPermission(ctx, perm)
+    if (status === 'granted') {
+      // 演示用：把"通讯录联系人"作为标签写入新笔记
+      // 真实实现请用 @kit.ContactsKit；此处用 mock 数据避免引入额外 SDK
+      const mockContacts = ['张三', '李四', '王五']
+      const store = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
+      if (store === undefined) {
+        return
+      }
+      const now = Date.now()
+      const newNote: Note = {
+        id: genNoteId(),
+        title: '通讯录导入 · ' + this.formatTime(now),
+        content: '从通讯录导入了 ' + mockContacts.length + ' 位联系人作为标签。',
+        createdAt: now,
+        updatedAt: now,
+        tags: mockContacts
+      }
+      this.notes = await store.add(newNote)
+      this.dataSource.setData(this.notes)
+      this.contactsDeniedForbidden = false
+      promptAction.showToast({ message: '已导入 ' + mockContacts.length + ' 位联系人', duration: 1500 })
+    } else if (status === 'denied_forbidden') {
+      this.contactsDeniedForbidden = true
+      promptAction.showToast({ message: '权限被永久拒绝，请在系统设置中开启', duration: 2000 })
+    } else {
+      promptAction.showToast({ message: '已取消授权', duration: 1500 })
+    }
   }
 
   private async addNewNote(): Promise<void> {
@@ -155,6 +207,10 @@ export struct NoteListPage {
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
             .layoutWeight(1)
+          Text('👥')
+            .fontSize(22)
+            .padding(8)
+            .onClick(() => this.importContacts())
           Text('⚙')
             .fontSize(22)
             .padding(8)
@@ -164,6 +220,31 @@ export struct NoteListPage {
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+
+        // 拒绝兜底 banner（denied_forbidden 状态展示）
+        if (this.contactsDeniedForbidden) {
+          Row({ space: 8 }) {
+            Text('⚠')
+              .fontSize(16)
+              .fontColor($r('app.color.danger'))
+            Text($r('app.string.perm_denied_hint'))
+              .fontSize(13)
+              .fontColor($r('app.color.primary_text'))
+              .layoutWeight(1)
+            Text('知道了')
+              .fontSize(13)
+              .fontColor($r('app.color.accent'))
+              .padding(4)
+              .onClick(() => {
+                this.contactsDeniedForbidden = false
+              })
+          }
+          .width('90%')
+          .padding(12)
+          .backgroundColor('#FFF3E0')
+          .borderRadius(8)
+          .margin({ left: 16, right: 16, bottom: 8 })
+        }
 
         if (this.loading) {
           LoadingProgress()
