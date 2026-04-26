@@ -1,13 +1,8 @@
-// NoteListPage — 笔记列表
+// NoteListPage — 笔记列表（v3-perf-optimized §21.3 修复中，分多步）
 //
-// ⚠️ 教学型性能债 #1（§21.3 演示修复用）：
-//   LazyForEach 的 keyGenerator 用 index 作 key。当列表中间删除 / 插入时，所有
-//   后续 item 的 index 变化 → 所有 key 失效 → 全部 item 重建。
-//   v3-perf-optimized 改：(item) => item.id
-//
-// ⚠️ 教学型性能债 #3（在 NoteStore 模块）：
-//   add/update/remove 都返回新数组，调用方只能 this.notes = [...]，触发整列表 build()。
-//   v3-perf-optimized 改：V2 @ObservedV2 + @Trace 字段级触发。
+// 教学型性能债 #1：已修复（keyGenerator 改用 item.id）
+// 教学型性能债 #2：v1 故意**不实现** aboutToDisappear 解绑监听器（v3-2 修复）
+// 教学型性能债 #3：在 NoteStore 模块（v3-3 改 V2 @ObservedV2 + @Trace 字段级）
 
 import { Note } from '../data/Note'
 import { NoteStore, NOTE_STORE_KEY } from '../data/NoteStore'
@@ -272,8 +267,8 @@ export struct NoteListPage {
                 this.NoteCard(note)
               }
             },
-            // ⚠️ 教学债 #1：用 index 作 key（应用 item.id）
-            (_note: Note, idx: number) => idx.toString())
+            // §21.3 修复：用 item.id 作 key（中间增删时变化项 key 不漂移，可复用未变 ListItem）
+            (note: Note) => note.id)
           }
           .width('100%')
           .layoutWeight(1)
