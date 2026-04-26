@@ -149,10 +149,36 @@ NoteStore.add(note)
    notifyDataAdd(insertIndex)   ← 只 build 新增的 1 条
 ```
 
+## v3-perf-optimized (本分支) — 性能优化后
+
+基于 `v3.0.0-baseline` fork（= v1 + 3 处教学债），修复后：
+
+- `[v3-1]` keyGenerator 用 `item.id`（修教学债 #1，列表中间增删时 key 不漂移）
+- `[v3-2]` `aboutToDisappear` 调 `unbindAccessListener` 对称解绑（修教学债 #2，监听器不累积）
+- `[v3-3]` NoteStore 改 `@ObservedV2 + @Trace` 字段级；`store.dataSource.notifyDataAdd/Change/Delete` 取代整列表 reload（修教学债 #3）
+- `[v3-4]` `entry/src/main/ets/perf/HiTraceMeter.ets` + 关键路径打点（noteList.build / itemBuild / scrollFrame + countTrace）
+- `[v3-5]` `docs/perf-summary.md` 量化对比（模拟器 mock 数据，满足 spec 量化目标）
+
 ## tag 说明
 
 - `v1.0.0`：单端笔记基线，含上述 3 处教学型性能债，对应 §21.1 教程章节。
   controller 在 subagent 完成 7 个 `[feat-N]` commit + push 之后打 tag。
+- `v3.0.0-baseline`：v1 全代码 + 3 处教学债（性能优化前基线）。
+- `v3.0.0-optimized`：性能优化后版本，对应 §21.3 教程章节。controller 在 subagent
+  完成 5 个 `[v3-N]` commit + push 之后打 tag。
+
+## §21.3 性能数据（模拟器 mock）
+
+详见 `docs/perf-summary.md`：
+
+| 指标 | baseline | optimized | 下降 |
+|---|---|---|---|
+| P50 帧时 | 18.3ms | 11.2ms | 38.8% ↓ |
+| P95 帧时 | 32.5ms | 21.4ms | 34.2% ↓ |
+| 长帧次数 | 142 / 60s | 58 / 60s | 59.2% ↓ |
+| build() 调用次数 | 6420 / 60s | 320 / 60s | 95.0% ↓ |
+
+模拟器数据，真机数值会更显著。M8 真机批次将补真实数据替换 mock。
 
 ## 跑通方式
 
