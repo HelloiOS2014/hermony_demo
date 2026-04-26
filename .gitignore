@@ -1,0 +1,33 @@
+# DevEco Studio / hvigor build outputs
+/build
+/.hvigor
+/.cxx
+/.idea
+/.deveco
+/oh_modules
+/local.properties
+/.test
+/build-tools
+
+# Module level
+**/build/
+**/oh_modules/
+**/.preview/
+**/.previewer/
+**/.test/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Signing material (must NEVER be committed)
+*.p12
+*.cer
+*.csr
+*.p7b
+*.jks
+*.keystore
+material/
