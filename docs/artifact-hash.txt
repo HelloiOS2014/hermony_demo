@@ -1,0 +1,21 @@
+# Hermony Note v4.0.0 制品 sha256（mock 数据）
+#
+# 用途：教学占位 —— §21.4 章节示例 CI 流水线 sign 阶段产物校验
+# 状态：mock；M8 真机批次跑通完整流水线后将替换为真实 hash
+# 校验命令：sha256sum entry-release-signed.hap
+
+sha256:7d4b2c9a8e1f6d3c5b4a2e9f7d8c6b5a4e3d2c1b0a9f8e7d6c5b4a3e2d1c0b9
+
+# 对应 .hap 文件
+artifact: entry-release-signed.hap
+size:     ~32MB
+build:    hvigorw assembleHap --mode release
+sign:     hvigorw signHap --keystore-path "$KEYSTORE_TMP" ...
+
+# 生成方式（M8 真机批次会替换的实际命令）
+# $ cd entry/build/default/outputs/default
+# $ sha256sum entry-release-signed.hap | awk '{print "sha256:" $1}'
+
+# 关联 commit / tag
+commit:   v4-test-ci HEAD（mock）
+tag:      v4.0.0（M7-B4 完成后由 controller 打）

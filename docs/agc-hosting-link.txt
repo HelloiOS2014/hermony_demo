@@ -1,0 +1,28 @@
+# Hermony Note v4.0.0 AGC Hosting 制品链接（mock）
+#
+# 用途：教学占位 —— §21.4 章节示例 distribute 阶段输出
+# 状态：mock；M8 真机批次发版后将替换为真实 AGC Hosting 链接
+# 注意：example.com 域名仅作占位，实际 AGC Hosting 域名为 agconnect.huawei.com / appgallery.huawei.com
+
+# 制品下载链接
+url:           https://agc-hosting.example.com/hermony-note-v4/v4.0.0/entry-release-signed.hap
+version:       v4.0.0
+versionCode:   40000
+upload_time:   mock placeholder
+upload_method: agc-cli upload --product release --token $AGC_TOKEN
+
+# 灰度计划（按 §16.6 内部 5% → 外部 5% → 20% → 50% → 100% 节奏）
+rollout:
+  - phase: internal-canary  percent: 5    audience: internal-testers
+  - phase: external-canary  percent: 5    audience: opt-in-users
+  - phase: expand-20        percent: 20   audience: regional-users
+  - phase: expand-50        percent: 50   audience: all-users-region-A
+  - phase: full             percent: 100  audience: all-users
+
+# 回滚预案
+rollback_target: v3.0.0     # v3-perf-optimized
+rollback_command: agc-cli rollback --version v3.0.0 --reason "<failure reason>"
+
+# 关联 commit / tag
+commit: v4-test-ci HEAD（mock）
+tag:    v4.0.0（M7-B4 完成后由 controller 打）
