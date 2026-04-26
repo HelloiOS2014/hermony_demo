@@ -3,3 +3,4 @@
 # 自动追加（每个 commit 完成后由 subagent 写入）
 
 [feat-1] 2677493f40024ef11453c728a2c36444eb162c2f
+[feat-2] 59a44b81578d75ab504629d97712a980f7f3c752

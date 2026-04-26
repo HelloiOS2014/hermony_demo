@@ -5,6 +5,44 @@
 //   notes(id TEXT PK, title TEXT, content TEXT, createdAt INT, updatedAt INT, tags TEXT)
 // 索引：
 //   idx_notes_updatedAt 用于 list 默认按 updatedAt DESC 排序
+//
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ §21.5 [feat-3] Android → HarmonyOS NEXT 迁移要点                      ║
+// ╠══════════════════════════════════════════════════════════════════════╣
+// ║ Android 原工程（v5-android-source 分支 [feat-3]）                     ║
+// ║   - data/Note.kt：@Entity(tableName="notes") + @PrimaryKey            ║
+// ║   - data/NoteDao.kt：@Dao + Flow<List<Note>>（Room 自动通知）          ║
+// ║   - data/NoteDatabase.kt：@Database(version=1, entities=[Note])      ║
+// ║   - Room.databaseBuilder + addCallback(onCreate) → 5 条 seed         ║
+// ║   - ViewModel 通过 dao.observeAll().stateIn(...) 派生 StateFlow      ║
+// ║                                                                      ║
+// ║ HarmonyOS 对应实现（本文件）                                          ║
+// ║   - relationalStore.getRdbStore(ctx, STORE_CONFIG) 拿 store           ║
+// ║   - 手写 SQL CREATE TABLE / CREATE INDEX                             ║
+// ║   - rdbStore.executeSql / insert / update / delete / query           ║
+// ║   - 没有 Flow 等价物：UI 通过 NoteStore（@Observed）做内存镜像       ║
+// ║     增删改时手动 push 更新；预置 5 条由 NoteStore.bootstrap 写入       ║
+// ║                                                                      ║
+// ║ 关键映射                                                              ║
+// ║   @Entity + @PrimaryKey                                               ║
+// ║       ↔  手写 CREATE TABLE + 主键约束                                 ║
+// ║   @Dao + suspend fun + Flow<List<T>>                                  ║
+// ║       ↔  RdbStore.query → ResultSet → 循环 mapToObject               ║
+// ║   Room.databaseBuilder + addCallback                                  ║
+// ║       ↔  relationalStore.getRdbStore + 首启 if-not-exists 建表        ║
+// ║   @Insert(onConflict=REPLACE)                                         ║
+// ║       ↔  RdbStore.insert(table, row, ConflictResolution.ON_CONFLICT_REPLACE) ║
+// ║   Room Migration                                                      ║
+// ║       ↔  RdbStore.executeSql ALTER TABLE + version 字段自维护         ║
+// ║                                                                      ║
+// ║ 注意点（迁移踩坑）                                                    ║
+// ║   1. Android KSP 自动生成 DAO 实现；ArkTS 手写映射会更长，            ║
+// ║      建议封装一个 mapResultSet(rs)→Note 私有方法（本文件已实现）       ║
+// ║   2. RdbStore.query 返回 Promise（不像 Room 的 suspend），           ║
+// ║      ArkTS 调用方必须用 await/then；UI 层不能假设同步返回             ║
+// ║   3. SecurityLevel：Android 默认 sandbox；鸿蒙必须显式声明            ║
+// ║      relationalStore.SecurityLevel.S1（普通业务数据）                ║
+// ╚══════════════════════════════════════════════════════════════════════╝
 
 import { relationalStore } from '@kit.ArkData'
 import { common } from '@kit.AbilityKit'

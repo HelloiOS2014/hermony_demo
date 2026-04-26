@@ -1,5 +1,16 @@
 // 数据 schema：v1 起即固定，v2+ 兼容（v2 起会在 RDB 表上加分布式属性）
 // 与 §21.1 教程 Note 类型一一对应
+//
+// §21.5 [feat-3] 迁移注释：
+//   Android 一侧（v5-android-source）的 data/Note.kt 是 @Entity 注解的 data class，
+//   主键 id 是 Long(autoGenerate)；ArkTS 这里用纯 interface + UUID v4 字符串主键。
+//   两者在功能上等价：
+//     Android: @PrimaryKey(autoGenerate=true) val id: Long
+//          ↔  ArkTS:   id: string (UUID v4 由 genNoteId() 生成)
+//     Android: @ColumnInfo(name="created_at")
+//          ↔  ArkTS:   createdAt 字段直接对齐 SQL 列名（手写 SQL 时保持一致）
+//   为什么 ArkTS 不用 number 主键？UUID 字符串便于 v2 起做分布式数据同步
+//   （deviceId 不会冲突），是 §21.2 多端协同的前置考量。
 
 export interface Note {
   id: string         // UUID v4
