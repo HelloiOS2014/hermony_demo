@@ -1,5 +1,43 @@
 // UserPrefsStore — Preferences API 封装（用户偏好持久化）
 // v1 仅持久化 themeMode / defaultTags / syncEnabled
+//
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ §21.5 [feat-5] Android → HarmonyOS NEXT 迁移要点                      ║
+// ╠══════════════════════════════════════════════════════════════════════╣
+// ║ Android 原工程（v5-android-source 分支 [feat-5]）                     ║
+// ║   - data/UserPrefsRepo.kt：preferencesDataStore("user_prefs")         ║
+// ║       darkMode: Flow<Boolean?>（null=跟随系统 / true=强制深 / false=浅）║
+// ║   - res/values-night/themes.xml：深色限定符资源                       ║
+// ║   - MainActivity：collectAsState + HermonyNoteTheme(darkTheme=...)   ║
+// ║       + AppCompatDelegate.setDefaultNightMode 同步窗口装饰            ║
+// ║                                                                      ║
+// ║ HarmonyOS 对应实现（本文件 + entry/src/main/resources/dark/）         ║
+// ║   - preferences.getPreferences(ctx, STORE_NAME) 单例                  ║
+// ║   - themeMode: 'light' | 'dark' | 'system'                            ║
+// ║   - resources/dark/element/color.json：深色限定词资源                 ║
+// ║   - 切到深色：UIAbility.onConfigurationUpdate 接 ColorMode             ║
+// ║                                                                      ║
+// ║ 关键映射                                                              ║
+// ║   DataStore Preferences (singleton via property delegate)             ║
+// ║       ↔  preferences.getPreferences(ctx, name)                       ║
+// ║   Flow<Boolean?>                                                      ║
+// ║       ↔  prefs.get + 自定义事件 emitter（无原生 Flow）                 ║
+// ║   res/values-night/themes.xml                                         ║
+// ║       ↔  resources/dark/element/color.json                            ║
+// ║   AppCompatDelegate.setDefaultNightMode                               ║
+// ║       ↔  app.context.config.colorMode 自动随系统                     ║
+// ║         + 强制：ConfigurationConstant.ColorMode.COLOR_MODE_DARK      ║
+// ║   isSystemInDarkTheme()                                               ║
+// ║       ↔  this.context.config.colorMode === ColorMode.COLOR_MODE_DARK ║
+// ║                                                                      ║
+// ║ 注意点（迁移踩坑）                                                    ║
+// ║   1. Compose 通过 CompositionLocal 自动重组；ArkTS 资源限定词由系统     ║
+// ║      切换，需要监听 onConfigurationUpdate 主动 setState 触发 build     ║
+// ║   2. Android valueRange 直接用 Float；ArkTS 偏好里的字号缩放建议        ║
+// ║      存 Number，UI 侧用 ConfigurationConstant 或自定义 px 计算         ║
+// ║   3. v1 鸿蒙工程 themeMode 是字符串枚举（'light'|'dark'|'system'），    ║
+// ║      Android 用 Boolean? null 三态；语义等价但映射时要转换             ║
+// ╚══════════════════════════════════════════════════════════════════════╝
 
 import { preferences } from '@kit.ArkData'
 import { common } from '@kit.AbilityKit'

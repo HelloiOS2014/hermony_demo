@@ -1,3 +1,14 @@
+// EntryAbility — 应用入口（UIAbility）
+//
+// §21.5 [feat-5] 迁移注释（深色主题）：
+//   Android 一侧（v5-android-source [feat-5]）的入口是 MainActivity（ComponentActivity），
+//   通过 AppCompatDelegate.setDefaultNightMode + isSystemInDarkTheme()
+//   决定整个应用的颜色基调；切换时 Activity 会自动重建。
+//   HarmonyOS NEXT 的颜色模式由 UIAbility.onConfigurationUpdate 通知，
+//   切换深色 / 浅色时 ConfigurationConstant.ColorMode 变化，
+//   resources/dark/element/* 限定词自动生效，无需手动重建窗口。
+//   强制深色可用 setColorMode(COLOR_MODE_DARK)，对应 Android 的 MODE_NIGHT_YES。
+
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit'
 import { window } from '@kit.ArkUI'
 import { hilog } from '@kit.PerformanceAnalysisKit'
