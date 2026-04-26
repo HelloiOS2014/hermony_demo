@@ -15,4 +15,10 @@
     <string name="perm_camera_rationale">需要相机权限以拍照插入到笔记中。</string>
     <string name="perm_camera_denied">已拒绝相机权限。可以前往「设置 - 应用 - 和音笔记 - 权限」手动开启。</string>
     <string name="perm_camera_granted">相机权限已授予，可以开始拍照。</string>
+
+    <!-- feat-5 主题切换 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_dark_mode">深色模式</string>
+    <string name="settings_dark_mode_summary">跟随开关切换。重启 App 仍保留。</string>
+    <string name="action_toggle_dark">切换深色</string>
 </resources>

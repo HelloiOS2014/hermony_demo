@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,6 +76,8 @@ class NoteListViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun NoteListScreen(
     viewModel: NoteListViewModel = viewModel(),
+    darkOverride: Boolean? = null,
+    onToggleDark: () -> Unit = {},
     onOpenDetail: (Long) -> Unit = {},
 ) {
     val notes by viewModel.notes.collectAsState()
@@ -82,6 +86,16 @@ fun NoteListScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.list_title)) },
+                actions = {
+                    IconButton(onClick = onToggleDark) {
+                        // feat-5：当前深色态显示太阳图标（按下切回浅色），反之亦然
+                        val isDarkActive = darkOverride == true
+                        Icon(
+                            imageVector = if (isDarkActive) Icons.Filled.LightMode else Icons.Filled.DarkMode,
+                            contentDescription = stringResource(R.string.action_toggle_dark),
+                        )
+                    }
+                },
             )
         },
         floatingActionButton = {

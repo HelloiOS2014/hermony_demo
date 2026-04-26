@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  English strings (values-en/). 教学项目仅举例，未做完整本地化。
+-->
+<resources>
+    <string name="app_name">Hermony Note</string>
+    <string name="list_title">My Notes</string>
+    <string name="list_empty">No notes yet. Tap + to create one.</string>
+    <string name="action_new">New note</string>
+
+    <string name="action_camera">Insert photo</string>
+    <string name="perm_camera_rationale">Camera permission is required to take a photo and insert it.</string>
+    <string name="perm_camera_denied">Camera permission denied. Open Settings to grant it manually.</string>
+    <string name="perm_camera_granted">Camera permission granted. You can take photos now.</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_dark_mode">Dark mode</string>
+    <string name="settings_dark_mode_summary">Follow toggle. Persists across restarts.</string>
+</resources>

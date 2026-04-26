@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  values-night 限定符：系统进入深色模式时被命中。
+  和 values/themes.xml 同名 style，仅覆盖 statusBar 配色。
+  Compose 侧由 isSystemInDarkTheme() 自动选 darkColorScheme。
+-->
+<resources>
+    <style name="Theme.HermonyNote" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#FF1B1B1F</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
