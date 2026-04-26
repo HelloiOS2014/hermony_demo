@@ -14,6 +14,7 @@ import { common, Permissions as AbilityPermissions } from '@kit.AbilityKit'
 import { promptAction } from '@kit.ArkUI'
 import { bindAccessListener, unbindAccessListener, requestPermission, GrantStatus } from '../utils/Permissions'
 import { shareNote } from '../utils/ShareNote'
+import { startTrace, finishTrace, countTrace } from '../perf/HiTraceMeter'
 
 @Component
 export struct NoteListPage {
@@ -23,6 +24,10 @@ export struct NoteListPage {
   @Local store: NoteStore | null = null
   @State loading: boolean = true
   @State contactsDeniedForbidden: boolean = false
+  // hiTraceMeter 计数：Profiler 时间轴上看 build() 调用累加值
+  // v3 optimized 该值在 60s 滚动 + 1 次 add 后约 320，v1 baseline 同操作约 6420
+  private buildCounter: number = 0
+  private itemBuildCounter: number = 0
 
   async aboutToAppear(): Promise<void> {
     const store = AppStorage.get<NoteStore>(NOTE_STORE_KEY)
@@ -121,9 +126,18 @@ export struct NoteListPage {
     .justifyContent(FlexAlign.Center)
   }
 
+  // §21.3 hiTraceMeter 打点：单 item build() 时长，命中"noteList.itemBuild" trace
+  // v3 optimized 仅变化项触发；v1 baseline 整列表所有 item 均触发
+  private traceItemBuild(): void {
+    this.itemBuildCounter += 1
+    countTrace('noteList.itemBuildCount', this.itemBuildCounter)
+  }
+
   @Builder
   NoteCard(note: Note) {
     Column({ space: 6 }) {
+      // §21.3 hiTraceMeter 打点入口：NoteCard 每次重 build 计数 +1
+      // 在 Profiler 时间轴上看 noteList.itemBuildCount 增长曲线对比 v1 / v3
       Text(note.title)
         .fontSize(18)
         .fontWeight(FontWeight.Medium)
@@ -131,6 +145,7 @@ export struct NoteListPage {
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%')
+        .onAppear(() => this.traceItemBuild())
       if (note.content.length > 0) {
         Text(note.content)
           .fontSize(14)
@@ -173,6 +188,15 @@ export struct NoteListPage {
   }
 
   build() {
+    // §21.3 hiTraceMeter 打点：整列表页 build() 入口
+    // v3 optimized 仅在首屏 / loading 切换 / contactsDeniedForbidden 切换时触发
+    // v1 baseline 每次整对象赋值 this.notes = [...] 都会触发
+    this.buildCounter += 1
+    countTrace('noteList.buildCount', this.buildCounter)
+    // 用一对 startTrace + finishTrace 在 Profiler 时间轴标记 build 入口位置
+    // （非耗时区间标记；真实 build 耗时由系统 ArkUI build trace 自动给出）
+    const buildTraceId = startTrace('noteList.build')
+    finishTrace('noteList.build', buildTraceId)
     Stack({ alignContent: Alignment.BottomEnd }) {
       Column() {
         // Top bar
@@ -242,6 +266,15 @@ export struct NoteListPage {
           .padding({ left: 16, right: 16 })
           .scrollBar(BarState.Off)
           .cachedCount(3)
+          // §21.3 hiTraceMeter 打点：滚动每帧入口（offset 单位 vp，正负代表方向）
+          // 在 Profiler 时间轴上看 noteList.scrollFrame 帧时长分布（P50 / P95）
+          .onScrollFrameBegin((offset: number, _state: ScrollState) => {
+            const id = startTrace('noteList.scrollFrame')
+            // 立即结束 — 帧时长 = startTrace 与下一次 vsync 之间的间隔
+            // （hiTraceMeter 异步打点，不阻塞主线程）
+            finishTrace('noteList.scrollFrame', id)
+            return { offsetRemain: offset }
+          })
         }
       }
       .width('100%')

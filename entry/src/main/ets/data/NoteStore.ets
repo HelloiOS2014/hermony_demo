@@ -14,6 +14,7 @@
 
 import { Note } from './Note'
 import { NoteRdb } from './NoteRdb'
+import { startTrace, finishTrace } from '../perf/HiTraceMeter'
 
 // 单例 key：在 EntryAbility 启动后塞进 AppStorage，页面 AppStorage.get 取
 export const NOTE_STORE_KEY = 'noteStore'
@@ -86,34 +87,40 @@ export class NoteStore {
     return this.notes
   }
 
-  // §21.3 修复：就地 push + notifyAdd，仅新增项 build()
+  // §21.3 修复：就地 push + notifyAdd，仅新增项 build()。hiTraceMeter 标记 itemBuild 入口
   async add(note: Note): Promise<number> {
+    const tid = startTrace('noteList.itemBuild')
     await this.rdb.insert(note)
     this.notes.push(note)
     const idx = this.notes.length - 1
     this.dataSource.notifyAdd(idx)
+    finishTrace('noteList.itemBuild', tid)
     return idx
   }
 
   // §21.3 修复：找到下标后**就地**字段级写 + notifyChange，仅该 ListItem 重 build()
   async update(note: Note): Promise<number> {
+    const tid = startTrace('noteList.itemBuild')
     await this.rdb.update(note)
     const idx = this.notes.findIndex((n) => n.id === note.id)
     if (idx >= 0) {
       this.notes[idx] = note
       this.dataSource.notifyChange(idx)
     }
+    finishTrace('noteList.itemBuild', tid)
     return idx
   }
 
   // §21.3 修复：splice 就地删除 + notifyDelete，仅触发该索引位置的删除通知
   async remove(id: string): Promise<number> {
+    const tid = startTrace('noteList.itemBuild')
     await this.rdb.deleteById(id)
     const idx = this.notes.findIndex((n) => n.id === id)
     if (idx >= 0) {
       this.notes.splice(idx, 1)
       this.dataSource.notifyDelete(idx)
     }
+    finishTrace('noteList.itemBuild', tid)
     return idx
   }
 
