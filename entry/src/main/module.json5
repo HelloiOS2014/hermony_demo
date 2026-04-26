@@ -26,6 +26,11 @@
         ]
       }
     ],
+    // §21.5 [feat-4] 迁移要点：
+    //   Android 一侧把 <uses-permission android:name="android.permission.CAMERA" />
+    //   写在 AndroidManifest.xml；HarmonyOS 写在 module.json5 的 requestPermissions[]，
+    //   并必须给出 reason（违反字符串引用规则会被 hvigor 校验阻断）。
+    //   user_grant 类型权限运行时还要再调 atManager.requestPermissionsFromUser。
     "requestPermissions": [
       {
         "name": "ohos.permission.READ_CONTACTS",

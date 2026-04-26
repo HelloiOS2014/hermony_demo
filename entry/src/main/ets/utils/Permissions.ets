@@ -1,5 +1,47 @@
 // Permissions — 通讯录 / 相机权限申请封装
 //
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ §21.5 [feat-4] Android → HarmonyOS NEXT 迁移要点                      ║
+// ╠══════════════════════════════════════════════════════════════════════╣
+// ║ Android 原工程（v5-android-source 分支 [feat-4]）                     ║
+// ║   - AndroidManifest.xml: <uses-permission android:name=".CAMERA" />  ║
+// ║   - util/CameraPermission.kt:                                         ║
+// ║       rememberCameraPermissionState() 基于                            ║
+// ║       ActivityResultContracts.RequestPermission                       ║
+// ║   - 三态：Idle / Granted / Denied，UI 据此切分支卡片                  ║
+// ║   - 启动时 ContextCompat.checkSelfPermission 同步当前授权             ║
+// ║                                                                      ║
+// ║ HarmonyOS 对应实现（本文件）                                          ║
+// ║   - module.json5 requestPermissions:                                  ║
+// ║       ohos.permission.READ_CONTACTS / CAMERA                         ║
+// ║   - abilityAccessCtrl.createAtManager().requestPermissionsFromUser    ║
+// ║   - on('selfPermissionStateChange') 监听权限态变化                    ║
+// ║   - GrantStatus.PERMISSION_GRANTED / PERMISSION_DENIED               ║
+// ║                                                                      ║
+// ║ 关键映射                                                              ║
+// ║   Manifest <uses-permission>                                          ║
+// ║       ↔  module.json5 requestPermissions[]                            ║
+// ║   ActivityResultContracts.RequestPermission                           ║
+// ║       ↔  atManager.requestPermissionsFromUser(ctx, [perm])           ║
+// ║   ContextCompat.checkSelfPermission                                   ║
+// ║       ↔  atManager.checkAccessTokenSync(tokenId, perm)               ║
+// ║   PackageManager.PERMISSION_GRANTED                                   ║
+// ║       ↔  GrantStatus.PERMISSION_GRANTED                               ║
+// ║   onRequestPermissionsResult (legacy)                                 ║
+// ║       ↔  on('selfPermissionStateChange', cb)                         ║
+// ║   "前往设置 - 应用 - 权限"引导                                        ║
+// ║       ↔  ACL（Access Control List）+ Settings.openSettings           ║
+// ║                                                                      ║
+// ║ 注意点（迁移踩坑）                                                    ║
+// ║   1. 鸿蒙 system_grant 权限（如 INTERNET）不需要弹窗，                  ║
+// ║      只 user_grant 才走 requestPermissionsFromUser；                   ║
+// ║      Android 只看 protectionLevel 判定，习惯上比鸿蒙宽松               ║
+// ║   2. on('selfPermissionStateChange') 必须对称 off！                  ║
+// ║      否则反复进出页面会累积监听器（见下面教学债 #2）                   ║
+// ║   3. Activity Result API 自动管理生命周期；ArkTS 必须手写             ║
+// ║      aboutToAppear/aboutToDisappear 配对                              ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+//
 // ⚠️ 教学型性能债 #2（§21.3 演示修复用）：
 //   下面的 abilityAccessCtrl 监听器在 aboutToAppear 时注册，但页面在 aboutToDisappear
 //   阶段**没有**对称解绑（off）。
